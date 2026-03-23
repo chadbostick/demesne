@@ -13,6 +13,7 @@ from agents.base import BaseAgent, AgentOutput
 from mechanics.ideologies import IDEOLOGIES
 from mechanics.cultures import CULTURE_TREE
 from mechanics.strategies import STRATEGIC_STANCES, COLOR_TO_MAKE_TYPE
+from mechanics.rename_examples import RENAME_EXAMPLES
 
 
 class FactionAgent(BaseAgent):
@@ -462,7 +463,7 @@ labels, no fantasy clichés. Pure in-character settler voice.
             "red":    ("gathering for prayer, ritual, and spiritual practice",
                        "a sacred site where the community gathers to mark what is holy"),
             "blue":   ("coming together to talk, debate, and share ideas",
-                       "a commons — a shared space where people meet, speak, and decide together"),
+                       "a commons — a shared space where people meet, speak, and decide"),
             "green":  ("leading and rallying people toward a shared direction",
                        "a landmark or marker that declares what this community stands for"),
             "orange": ("organizing labor, coordinating people, and getting things done",
@@ -472,6 +473,17 @@ labels, no fantasy clichés. Pure in-character settler voice.
         }
         activity_desc, make_desc = _COLOR_ACTIVITY.get(color, (old_strategy_name, old_make_name))
 
+        examples = RENAME_EXAMPLES.get(option.lower(), {})
+        sample_strategies = ", ".join(f'"{s}"' for s in examples.get("strategies", [])[:6])
+        sample_makes = ", ".join(f'"{m}"' for m in examples.get("makes", [])[:5])
+        examples_block = ""
+        if sample_strategies or sample_makes:
+            examples_block = (
+                f"\nSAMPLE NAMES for {option} culture (choose one or invent something similar):\n"
+                + (f"  Strategy options: {sample_strategies}\n" if sample_strategies else "")
+                + (f"  Make options:     {sample_makes}\n" if sample_makes else "")
+            )
+
         prompt = f"""\
 Your settlement has just shaped its {category} culture around: {option}.
 
@@ -479,35 +491,21 @@ This changes how your community describes two of its core activities. Your task 
 
 THE ACTIVITY (strategy):
 People {activity_desc}.
-Now that the community's {category} is defined by {option}, what do your people CALL this practice?
-The name should evoke how {option} colors the way this activity feels and is talked about.
-Your ideology ({self.faction_data['ideology']}) shapes the flavor of the word — but the name
-describes a community practice, not a personal power or supernatural ability.
+With {option} now defining {category} here, what do your people CALL this practice?
+Your ideology ({self.faction_data['ideology']}) can flavor the word — but the name must describe
+a community practice or verb, not a personal power or supernatural ability.
 
 THE PLACE (make):
 People build {make_desc}.
-Now that the community's {category} is defined by {option}, what do your people CALL this place or act?
-Again: a community name, not an ability.
-
-GOOD EXAMPLES (for reference only — do not copy):
-  "discuss" shaped by Authoritarian Politics → "Decree"
-  "discuss" shaped by Impulsive Mindset → "Open Call" or "Speak Out"
-  "Commons" shaped by Impulsive Mindset → "Rally Hall" or "Gather Green"
-  "pray" shaped by Nature Spirituality → "Grove Rite" or "Earth Song"
-  "organize" shaped by Authoritarian Politics → "Command"
-  "Storehouse" shaped by Authoritarian Politics → "Barracks"
-
-BAD EXAMPLES (avoid):
-  Supernatural abilities: "Flash Vision", "Spirit Surge", "Mystic Pulse"
-  Generic: "New Strategy", "Enhanced Gather"
-  Abstract concepts: "Enlightenment", "Transcendence"
-
+With {option} now defining {category} here, what do your people CALL this place or act?
+A noun for a real place or communal act — not a power or abstract concept.
+{examples_block}
 Output your choice in this exact format:
 
 <rename_choice>
 {{
-  "strategy_name": "<1-2 words: what the community calls this practice>",
-  "make_name": "<1-2 words: what the community calls this place or act>"
+  "strategy_name": "<1-2 words>",
+  "make_name": "<1-2 words>"
 }}
 </rename_choice>
 
