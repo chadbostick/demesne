@@ -456,37 +456,62 @@ labels, no fantasy clichés. Pure in-character settler voice.
     ) -> "AgentOutput":
         """
         After a culture level-up, the buying faction renames the Strategy and Make
-        action for that color. Returns 1-2 word names rooted in the new culture + ideology.
+        action for that color. Returns 1-2 word names rooted in what the community does.
         """
+        _COLOR_ACTIVITY = {
+            "red":    ("gathering for prayer, ritual, and spiritual practice",
+                       "a sacred site where the community gathers to mark what is holy"),
+            "blue":   ("coming together to talk, debate, and share ideas",
+                       "a commons — a shared space where people meet, speak, and decide together"),
+            "green":  ("leading and rallying people toward a shared direction",
+                       "a landmark or marker that declares what this community stands for"),
+            "orange": ("organizing labor, coordinating people, and getting things done",
+                       "a storehouse where goods, tools, or resources are managed and distributed"),
+            "pink":   ("scouting, foraging, and gathering from the land",
+                       "a workyard where people craft, build, and process what the land provides"),
+        }
+        activity_desc, make_desc = _COLOR_ACTIVITY.get(color, (old_strategy_name, old_make_name))
+
         prompt = f"""\
-You are {self.faction_data['name']}.
+Your settlement has just shaped its {category} culture around: {option}.
 
-{self._ideology_block()}
+This changes how your community describes two of its core activities. Your task is to rename them.
 
-YOUR SETTLEMENT has just established a new cultural truth: {option} (the {category} of this place).
+THE ACTIVITY (strategy):
+People {activity_desc}.
+Now that the community's {category} is defined by {option}, what do your people CALL this practice?
+The name should evoke how {option} colors the way this activity feels and is talked about.
+Your ideology ({self.faction_data['ideology']}) shapes the flavor of the word — but the name
+describes a community practice, not a personal power or supernatural ability.
 
-This has reshaped how your people approach a fundamental activity. The old names were:
-  Strategy: "{old_strategy_name}"
-  Make action: "{old_make_name}"
+THE PLACE (make):
+People build {make_desc}.
+Now that the community's {category} is defined by {option}, what do your people CALL this place or act?
+Again: a community name, not an ability.
 
-Now that {option} defines the culture of {category} here, give these activities new names that:
-- Reflect the spirit of {option} in 1-2 words
-- Carry the flavor of your ideology and worldview
-- Are concrete and evocative, not generic
+GOOD EXAMPLES (for reference only — do not copy):
+  "discuss" shaped by Authoritarian Politics → "Decree"
+  "discuss" shaped by Impulsive Mindset → "Open Call" or "Speak Out"
+  "Commons" shaped by Impulsive Mindset → "Rally Hall" or "Gather Green"
+  "pray" shaped by Nature Spirituality → "Grove Rite" or "Earth Song"
+  "organize" shaped by Authoritarian Politics → "Command"
+  "Storehouse" shaped by Authoritarian Politics → "Barracks"
 
-Examples of good naming:
-  Pray → "Consecrate", Organize → "Command", Forage → "Harvest", Make Storehouse → "Barracks"
+BAD EXAMPLES (avoid):
+  Supernatural abilities: "Flash Vision", "Spirit Surge", "Mystic Pulse"
+  Generic: "New Strategy", "Enhanced Gather"
+  Abstract concepts: "Enlightenment", "Transcendence"
 
 Output your choice in this exact format:
 
 <rename_choice>
 {{
-  "strategy_name": "<1-2 word name for the strategy>",
-  "make_name": "<1-2 word name for the make action>"
+  "strategy_name": "<1-2 words: what the community calls this practice>",
+  "make_name": "<1-2 words: what the community calls this place or act>"
 }}
 </rename_choice>
 
-Nothing else. Names only — no explanation.
+Nothing else.
 """
         return self._call_llm(prompt, era, "rename_strategy", max_tokens=128)
 
