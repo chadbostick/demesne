@@ -104,7 +104,7 @@ class Arbiter:
         outputs = []
         _all_colors = ["red", "blue", "green", "orange", "pink"]
 
-        for agent in self._factions:
+        for agent in self._factions_in_initiative_order(state):
             fname = agent.faction_data["name"]
             faction = state.get_faction(fname)
             tokens = dict(faction["tokens"])
@@ -256,7 +256,7 @@ class Arbiter:
         print(f"\n  [INVESTMENT PHASE]")
         outputs = []
         any_purchase_made = False
-        for agent in self._factions:
+        for agent in self._factions_in_initiative_order(state):
             fname = agent.faction_data["name"]
             faction = state.get_faction(fname)
             tokens = dict(faction["tokens"])
@@ -430,6 +430,14 @@ class Arbiter:
         )
         self._logger.log(rename_out)
         outputs.append(rename_out.to_dict())
+
+    def _factions_in_initiative_order(self, state: "SettlementState") -> list["FactionAgent"]:
+        """Return faction agents sorted by initiative order (highest roll first)."""
+        order = state.initiative_order
+        if not order:
+            return self._factions
+        rank = {name: i for i, name in enumerate(order)}
+        return sorted(self._factions, key=lambda a: rank.get(a.faction_data["name"], len(order)))
 
     def _can_afford(self, tokens: dict, cost: dict) -> bool:
         return all(tokens.get(c, 0) >= n for c, n in cost.items())
