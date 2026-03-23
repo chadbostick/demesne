@@ -2,87 +2,48 @@ from dataclasses import dataclass, field
 
 
 @dataclass
-class RiffingRule:
-    """
-    Defines a conditional injection of one agent's output into another's prompt.
-
-    condition options:
-      "always"                  – always inject
-      "if_keyword:<word>"       – inject only if source output contains <word>
-      "if_round_gt:<n>"         – inject only if current round > n
-    """
-    source_role: str
-    target_role: str
-    condition: str = "always"
-    excerpt_lines: int = 5      # how many lines of source output to inject
-
-
-@dataclass
 class PhaseConfig:
     name: str
     description: str
-    agent_roles: list[str] = field(default_factory=list)
-    riffing_rules: list[RiffingRule] = field(default_factory=list)
+    # No agent_roles here — agents are dispatched dynamically by Arbiter based on faction list
 
 
-# ── Default 4-phase sequence ──────────────────────────────────────────────────
-
-EVENT_PHASE = PhaseConfig(
-    name="event",
-    description="The Historian generates an inciting event that befalls the settlement.",
-    agent_roles=["historian"],
-    riffing_rules=[],
-)
-
-INTERPRETATION_PHASE = PhaseConfig(
-    name="interpretation",
-    description="The Prophet and Rumormonger interpret the event's meaning.",
-    agent_roles=["prophet", "rumormonger"],
-    riffing_rules=[
-        # Rumormonger sees the Prophet's interpretation first
-        RiffingRule(
-            source_role="prophet",
-            target_role="rumormonger",
-            condition="always",
-            excerpt_lines=5,
-        ),
-    ],
-)
-
-EXPANSION_PHASE = PhaseConfig(
-    name="expansion",
-    description="The Cartographer expands on physical and social consequences.",
-    agent_roles=["cartographer"],
-    riffing_rules=[
-        # Cartographer is fed the Historian's event and Prophet's interpretation
-        RiffingRule(
-            source_role="historian",
-            target_role="cartographer",
-            condition="always",
-            excerpt_lines=4,
-        ),
-        RiffingRule(
-            source_role="prophet",
-            target_role="cartographer",
-            condition="always",
-            excerpt_lines=3,
-        ),
-    ],
-)
-
-CONSEQUENCE_PHASE = PhaseConfig(
-    name="consequence",
+STRATEGY_PHASE = PhaseConfig(
+    name="strategy",
     description=(
-        "The Arbiter collects all state patches from this round and applies them "
-        "to the Settlement State. No agents run — this is a deterministic merge step."
+        "Each faction chooses a strategy (Pray, Discuss, Lead, Organize, Forage, or Make). "
+        "The GM rolls a d20 per faction and awards tokens based on the payout table."
     ),
-    agent_roles=[],   # Arbiter-only: no agent calls
-    riffing_rules=[],
+)
+
+INVESTMENT_PHASE = PhaseConfig(
+    name="investment",
+    description=(
+        "Factions spend tokens to unlock Culture upgrades. Prerequisites must be met (L1 before L2, etc.). "
+        "Factions may pool tokens or block opponents by purchasing opposing options."
+    ),
+)
+
+CHALLENGE_PHASE = PhaseConfig(
+    name="challenge",
+    description=(
+        "A settlement-wide challenge is drawn. The Leading Faction decides the response. "
+        "All factions may donate tokens (+1 per token to the d20 roll). "
+        "10+ = success (boon + leading faction stays); 9 or less = failure (new leading faction)."
+    ),
+)
+
+END_OF_ERA_PHASE = PhaseConfig(
+    name="end_of_era",
+    description=(
+        "The GM summarizes the era's events, faction power shifts, and settlement changes. "
+        "VP is calculated. Victory condition is checked."
+    ),
 )
 
 DEFAULT_PHASES: list[PhaseConfig] = [
-    EVENT_PHASE,
-    INTERPRETATION_PHASE,
-    EXPANSION_PHASE,
-    CONSEQUENCE_PHASE,
+    STRATEGY_PHASE,
+    INVESTMENT_PHASE,
+    CHALLENGE_PHASE,
+    END_OF_ERA_PHASE,
 ]

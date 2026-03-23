@@ -1,0 +1,188 @@
+"""
+Strategy definitions, payout tables, and Make exchange logic.
+"""
+import random
+
+
+# ── Payout tables ──────────────────────────────────────────────────────────────
+# Format: list of (min_roll, max_roll, base_tokens, bonus_choice_tokens)
+# bonus_choice_tokens > 0 means that many additional tokens of the faction's choice
+
+PAYOUT_TABLES: dict = {
+    "base": [
+        (1,  4,  0, 0),
+        (5,  15, 1, 0),
+        (16, 19, 2, 0),
+        (20, 20, 2, 1),  # 2 of color + 1 of choice
+    ],
+    "level1": [
+        (1,  1,  0, 0),
+        (2,  4,  1, 0),
+        (5,  16, 2, 0),
+        (17, 19, 3, 0),
+        (20, 20, 3, 1),  # 3 of color + 1 of choice
+    ],
+    "level2": [
+        (1,  1,  1, 0),
+        (2,  3,  2, 0),
+        (4,  9,  3, 0),
+        (10, 15, 4, 0),
+        (16, 19, 5, 2),  # 5 of color + 2 of choice
+        (20, 20, 6, 3),  # 6 of color + 3 of choice
+    ],
+    "level3": [
+        (1,  4,  2,  0),
+        (5,  10, 4,  0),
+        (11, 15, 6,  0),
+        (16, 19, 6,  4),   # 6 of color + 4 of any
+        (20, 20, 12, 0),   # 12 of any combination (handled specially)
+    ],
+}
+
+
+def roll_strategy_dice(color_level: int) -> tuple[int, list[int]]:
+    """
+    Roll (color_level + 1) d20s.  Returns (best_roll, all_rolls).
+    L0 = 1d20, L1 = 2d20 take best, L2 = 3d20 take best, L3 = 4d20 take best.
+    """
+    from mechanics.dice import roll as _roll
+    n = max(1, color_level + 1)
+    rolls = [_roll(20) for _ in range(n)]
+    return max(rolls), rolls
+
+
+def lookup_payout(table_name: str, roll: int) -> tuple[int, int]:
+    """
+    Returns (base_tokens, bonus_choice_tokens) for a given roll.
+    For level3 roll=20, returns (0, 12) to signal 12 free-choice tokens.
+    """
+    if table_name == "level3" and roll == 20:
+        return (0, 12)
+    for (lo, hi, base, bonus) in PAYOUT_TABLES[table_name]:
+        if lo <= roll <= hi:
+            return (base, bonus)
+    return (0, 0)
+
+
+# ── Strategy color mappings ────────────────────────────────────────────────────
+
+BASE_STRATEGIES: dict = {
+    "pray":     {"token_color": "red",    "payout_table": "base"},
+    "discuss":  {"token_color": "blue",   "payout_table": "base"},
+    "lead":     {"token_color": "green",  "payout_table": "base"},
+    "organize": {"token_color": "orange", "payout_table": "base"},
+    "forage":   {"token_color": "pink",   "payout_table": "base"},
+}
+
+# Culture categories map to the token color of their unlocked strategy
+CULTURE_STRATEGY_COLOR: dict = {
+    "spirituality":    "red",
+    "mindset":         "blue",
+    "social_order":    "blue",
+    "values":          "green",
+    "politics":        "orange",
+    "property":        "orange",
+    "production":      "pink",
+    "natural_affinity": "pink",
+}
+
+# Strategy payout table based on the level of the culture that unlocked it
+CULTURE_LEVEL_TO_TABLE: dict = {
+    1: "level1",
+    2: "level2",
+    3: "level3",
+}
+
+
+# ── Make exchange tables ───────────────────────────────────────────────────────
+
+BASE_MAKE_OPTIONS: dict = {
+    "holy_site":  {"exchange_color": "red",    "give": 2, "receive": 2},
+    "commons":    {"exchange_color": "blue",   "give": 2, "receive": 2},
+    "marker":     {"exchange_color": "green",  "give": 2, "receive": 2},
+    "storehouse": {"exchange_color": "orange", "give": 2, "receive": 2},
+    "workyard":   {"exchange_color": "pink",   "give": 2, "receive": 2},
+}
+
+# Make exchange receive count scales with color level: give × (level + 1)
+# L0: give=2, receive=2  |  L1: give=2, receive=4  |  L2: give=2, receive=6  |  L3: give=2, receive=8
+def make_receive_for_level(color_level: int, give: int) -> int:
+    """Return receive count for a make exchange at the given color culture level."""
+    return give * (color_level + 1)
+
+
+def apply_make_exchange(
+    tokens: dict,
+    exchange_color: str,
+    give: int,
+    receive: int,
+    receive_colors: list[str],
+) -> dict:
+    """
+    Apply a Make exchange to a token dict.
+    receive_colors is a list of colors chosen by the faction, length == receive.
+    Returns the updated token dict.
+    """
+    import copy
+    t = copy.copy(tokens)
+    if t.get(exchange_color, 0) < give:
+        raise ValueError(
+            f"Insufficient {exchange_color} tokens: need {give}, have {t.get(exchange_color, 0)}"
+        )
+    t[exchange_color] = t[exchange_color] - give
+    for color in receive_colors:
+        t[color] = t.get(color, 0) + 1
+    return t
+
+
+# ── Strategic stances ─────────────────────────────────────────────────────────
+# LLM picks a stance; Arbiter resolves it to a concrete base strategy + color
+
+STRATEGIC_STANCES: dict = {
+    "pursue_primary":   {"description": "Focus on tokens needed for your Primary goal"},
+    "pursue_secondary": {"description": "Focus on tokens needed for your Secondary goals"},
+    "pursue_tertiary":  {"description": "Focus on tokens for your Tertiary category"},
+    "coordinate":       {"description": "Support a cooperative purchase this era"},
+    "oppose":           {"description": "Accumulate tokens to block an opposing culture"},
+    "make":             {"description": "Exchange tokens to build something physical"},
+}
+
+# Maps token color to canonical Make structure type name
+COLOR_TO_MAKE_TYPE: dict = {
+    "red":    "Holy Site",
+    "blue":   "Commons",
+    "green":  "Marker",
+    "orange": "Storehouse",
+    "pink":   "Workyard",
+}
+
+# Challenge categories — easily extensible to hundreds of entries
+CHALLENGE_CATEGORIES: list = [
+    {"category": "Envoy Arrives",   "description": "A powerful visitor arrives with demands, offers, or secrets."},
+    {"category": "Weather Event",   "description": "A severe weather phenomenon threatens the settlement."},
+    {"category": "Magical Malady",  "description": "A mysterious magical affliction descends on the settlement."},
+    {"category": "Monsters Attack", "description": "Hostile creatures threaten the settlement's people or resources."},
+]
+
+
+def award_tokens(
+    tokens: dict,
+    color: str,
+    base_count: int,
+    bonus_count: int,
+    bonus_colors: list[str] | None = None,
+) -> dict:
+    """
+    Award base_count tokens of color, plus bonus_count tokens of bonus_colors.
+    If bonus_colors is None, randomly pick colors for the bonus.
+    Returns updated token dict.
+    """
+    import copy
+    ALL_COLORS = ["red", "blue", "green", "orange", "pink"]
+    t = copy.copy(tokens)
+    t[color] = t.get(color, 0) + base_count
+    if bonus_count > 0:
+        chosen = bonus_colors or [random.choice(ALL_COLORS) for _ in range(bonus_count)]
+        for c in chosen:
+            t[c] = t.get(c, 0) + 1
+    return t
