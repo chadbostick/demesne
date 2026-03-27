@@ -26,6 +26,12 @@ from mechanics.strategies import STRATEGIC_STANCES
 from mechanics.worldbuilding import LOCATIONS, TERRAINS, DND5_RACES
 
 
+def _vprint(*args, **kwargs):
+    """Print only if verbose mode is on."""
+    if config.VERBOSE:
+        print(*args, **kwargs)
+
+
 def _empty_tokens() -> dict:
     return {"red": 0, "blue": 0, "green": 0, "orange": 0, "pink": 0}
 
@@ -113,11 +119,11 @@ def main() -> None:
     chosen_ideologies = random.sample(list(IDEOLOGIES.keys()), num_factions)
 
     print(f"Demesne simulation starting...")
-    print(f"  Settlement : {args.settlement_name}")
-    print(f"  Eras       : {args.eras}")
-    print(f"  Output dir : {args.output_dir}")
-    print(f"  Model      : {config.MODEL}")
-    print(f"  Factions   : {num_factions} — {', '.join(chosen_ideologies)}")
+    _vprint(f"  Settlement : {args.settlement_name}")
+    _vprint(f"  Eras       : {args.eras}")
+    _vprint(f"  Output dir : {args.output_dir}")
+    _vprint(f"  Model      : {config.MODEL}")
+    _vprint(f"  Factions   : {num_factions} — {', '.join(chosen_ideologies)}")
 
     # Initialize logger early so pre-game events are captured
     logger = ActionLogger(args.output_dir)
@@ -138,13 +144,13 @@ def main() -> None:
     terrain = random.choice(TERRAINS)
     state.set_location(location)
     state.set_terrain(terrain)
-    print(f"\n  [GEOGRAPHY]")
-    print(f"    Location : {location}")
-    print(f"    Terrain  : {terrain}")
+    _vprint(f"\n  [GEOGRAPHY]")
+    _vprint(f"    Location : {location}")
+    _vprint(f"    Terrain  : {terrain}")
     logger.log_event("geography", era=0, location=location, terrain=terrain)
 
     # ── Initiative rolls & species ───────────────────────────────────────────
-    print("\n  [INITIATIVE ROLLS]")
+    _vprint("\n  [INITIATIVE ROLLS]")
     initiative_rolls: dict[str, int] = {}
     for agent in faction_agents:
         fname = agent.faction_data["name"]
@@ -154,27 +160,27 @@ def main() -> None:
         faction = state.get_faction(fname)
         faction["species"] = species
         agent.faction_data = faction
-        print(f"    {fname}: rolled {r} — {species}")
+        _vprint(f"    {fname}: rolled {r} — {species}")
         logger.log_event("species_roll", era=0, faction=fname, species=species)
 
     initiative_order = sorted(initiative_rolls, key=lambda n: initiative_rolls[n], reverse=True)
     state.set_initiative_order(initiative_order)
     for agent in faction_agents:
         agent.faction_data = state.get_faction(agent.faction_data["name"])
-    print(f"\n  Leading faction: {initiative_order[0]}")
-    print(f"  Initiative order: {', '.join(initiative_order)}")
+    _vprint(f"\n  Leading faction: {initiative_order[0]}")
+    _vprint(f"  Initiative order: {', '.join(initiative_order)}")
     logger.log_event("initiative", era=0, rolls=initiative_rolls, order=initiative_order, leader=initiative_order[0])
     pause("  ── Initiative set. Press Space/Enter to continue or Esc to quit ──")
 
     # ── Faction introductions (LLM) ──────────────────────────────────────────
-    print("\n  [FACTION INTRODUCTIONS]")
+    print("\n  ── The Settlers Arrive ──")
     all_faction_data = [state.get_faction(a.faction_data["name"]) for a in faction_agents]
     for agent in faction_agents:
         fname = agent.faction_data["name"]
         neighbors = [f for f in all_faction_data if f["name"] != fname]
-        print(f"\n    → {fname} introducing themselves...", end="", flush=True)
+        _vprint(f"\n    → {fname} introducing themselves...", end="", flush=True)
         intro_output = agent.introduce_faction(location, terrain, neighbors)
-        print(" done.\n")
+        _vprint(" done.\n")
         intro = agent.parse_faction_intro(intro_output)
         if intro:
             new_name = intro.get("faction_name", fname)
@@ -192,9 +198,9 @@ def main() -> None:
             if state._data["leading_faction"] == fname:
                 state._data["leading_faction"] = new_name
             agent.role = f"faction_{new_name.lower().replace(' ', '_')}"
-            print(f"  {new_name} ({agent.faction_data['species']} {org_type})")
+            print(f"\n  **{new_name} ({agent.faction_data['ideology']} {agent.faction_data['species']})**")
             if description:
-                print(f"    {description}")
+                print(f"  {description}")
             logger.log_event("faction_intro", era=0,
                 old_name=fname, new_name=new_name, species=agent.faction_data["species"],
                 ideology=agent.faction_data["ideology"], organization_type=org_type,
@@ -203,9 +209,9 @@ def main() -> None:
 
     # ── Settlement naming (leading faction, LLM) ─────────────────────────────
     leader_agent = next(a for a in faction_agents if a.faction_data["name"] == state.leading_faction)
-    print(f"\n    → {state.leading_faction} naming the settlement...", end="", flush=True)
+    _vprint(f"\n    → {state.leading_faction} naming the settlement...", end="", flush=True)
     naming_output = leader_agent.name_settlement(location, terrain)
-    print(" done.\n")
+    _vprint(" done.\n")
     naming_choice = leader_agent.parse_settlement_name(naming_output)
     settlement_name = naming_choice.get("name") or args.settlement_name
     landmark_desc = naming_choice.get("description", "")

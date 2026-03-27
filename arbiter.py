@@ -132,10 +132,10 @@ class Arbiter:
                 # 2. Reconsider stance via LLM if triggered
                 if faction.get("needs_reconsideration", False):
                     context = MemoryContext.build(state, self._logger, self._memory_window, fname)
-                    print(f"\n    → {fname} reconsidering stance (LLM)...", end="", flush=True)
+                    self._vprint(f"\n    → {fname} reconsidering stance (LLM)...", end="", flush=True)
                     output = agent.run_strategy(context, state.era, state._data["available_strategies"], cultures=state.cultures)
-                    print(" done.\n")
-                    print(output.content)
+                    self._vprint(" done.\n")
+                    self._vprint(output.content)
                     self._logger.log(output)
                     outputs.append(output.to_dict())
                     choice = agent.parse_strategy_choice(output)
@@ -179,7 +179,7 @@ class Arbiter:
                             tokens_after=dict(tokens))
 
                         # LLM describes the structure
-                        print(f"    → {fname} describing their construction...", end="", flush=True)
+                        self._vprint(f"    → {fname} describing their construction...", end="", flush=True)
                         make_out = agent.run_make_narrative(
                             era=state.era,
                             make_type=custom_make_name,
@@ -263,7 +263,7 @@ class Arbiter:
         # ── GM strategy summary narration ─────────────────────────────────────
         narration_mode = config.STRATEGY_NARRATION_MODE
         if narration_mode != "off" and _faction_summaries:
-            print(f"\n    → GM summarizing the era's efforts...", end="", flush=True)
+            self._vprint(f"\n    → GM summarizing the era's efforts...", end="", flush=True)
             gm_output = self._gm.narrate_strategy_phase(
                 round_num=state.era,
                 state_summary=state.summary(),
@@ -573,7 +573,7 @@ class Arbiter:
                 continue
 
             context = MemoryContext.build(state, self._logger, self._memory_window, fname)
-            print(f"\n    → {fname} deciding investments...", end="", flush=True)
+            self._vprint(f"\n    → {fname} deciding investments...", end="", flush=True)
             output = agent.run_investment(context, state.era, state.cultures)
             print(" done.\n")
 
@@ -617,7 +617,7 @@ class Arbiter:
                 state.unlock_make_option(new_make)
 
                 # GM chronicles this cultural shift — it's a big deal
-                print(f"\n    → GM chronicling cultural shift...", end="", flush=True)
+                self._vprint(f"\n    → GM chronicling cultural shift...", end="", flush=True)
                 culture_narrative = self._gm.narrate_culture_purchase(
                     state.era, cat, option, fname, state._data["name"]
                 )
@@ -634,7 +634,7 @@ class Arbiter:
                 self._check_color_level_up(state, color, cat, option, agent, outputs)
 
             if purchased_any:
-                print(output.content)
+                self._vprint(output.content)
                 self._logger.log(output)
                 outputs.append(output.to_dict())
                 tok_str = ", ".join(f"{c}:{n}" for c, n in tokens.items())
@@ -773,7 +773,7 @@ class Arbiter:
         co_founders = [n for n in founder_names if n != founder_agent.faction_data["name"]]
 
         # Faction names the place
-        print(f"\n    → {founder_agent.faction_data['name']} founding a {tier}...", end="", flush=True)
+        self._vprint(f"\n    → {founder_agent.faction_data['name']} founding a {tier}...", end="", flush=True)
         name_output = founder_agent.name_place(
             era=state.era,
             tier=tier,
@@ -795,7 +795,7 @@ class Arbiter:
         outputs.append(name_output.to_dict())
 
         # GM describes how it fits into the landscape
-        print(f"\n    → GM mapping the new {tier}...", end="", flush=True)
+        self._vprint(f"\n    → GM mapping the new {tier}...", end="", flush=True)
         gm_output = self._gm.narrate_place_founding(
             round_num=state.era,
             place_name=place_name,
@@ -854,7 +854,7 @@ class Arbiter:
         rename_out = buyer_agent.run_rename_strategy(
             state.era, color, category, option, old_strategy, old_make
         )
-        print(" done.")
+        self._vprint(" done.")
 
         choice = buyer_agent.parse_rename_choice(rename_out)
         new_strat = choice.get("strategy_name", "").strip() or old_strategy
@@ -1031,7 +1031,7 @@ class Arbiter:
                     cooperative=True, contributors=pool)
 
                 # GM chronicles this cultural shift
-                print(f"\n    → GM chronicling cultural shift...", end="", flush=True)
+                self._vprint(f"\n    → GM chronicling cultural shift...", end="", flush=True)
                 purchaser_str = " + ".join(pool.keys())
                 culture_narrative = self._gm.narrate_culture_purchase(
                     state.era, cat, option, purchaser_str, state._data["name"]
@@ -1170,7 +1170,7 @@ class Arbiter:
         self._vprint(f"    Difficulty: {difficulty}")
 
         # GM narrates the challenge with regional specifics
-        print(f"\n    → GM describing the challenge...", end="", flush=True)
+        self._vprint(f"\n    → GM describing the challenge...", end="", flush=True)
         gm_challenge = self._gm.narrate_challenge(
             context={},
             round_num=state.era,
@@ -1199,7 +1199,7 @@ class Arbiter:
         # ── Leader narrates their plan (before the roll) ──────────────────────
         leader_plan_text = ""
         if leader_agent:
-            print(f"\n    → {leading_name} declaring their plan...", end="", flush=True)
+            self._vprint(f"\n    → {leading_name} declaring their plan...", end="", flush=True)
             plan_output = leader_agent.run_challenge_plan(
                 state.era, challenge_text, cultures=state.cultures
             )
@@ -1377,7 +1377,7 @@ class Arbiter:
 
         # ── Step 4: GM narrates the outcome ──────────────────────────────────
         donation_summary = "; ".join(donation_parts)
-        print(f"\n    → GM chronicling the outcome...", end="", flush=True)
+        self._vprint(f"\n    → GM chronicling the outcome...", end="", flush=True)
         outcome_output = self._gm.narrate_challenge_outcome(
             round_num=state.era,
             challenge_text=challenge_text,
@@ -1393,7 +1393,7 @@ class Arbiter:
 
         # ── Step 5: GM narrates the boon(s) if success ─────────────────────────
         if success and boons:
-            print(f"\n    → GM chronicling the boon...", end="", flush=True)
+            self._vprint(f"\n    → GM chronicling the boon...", end="", flush=True)
             boon_output = self._gm.narrate_boon(
                 round_num=state.era,
                 boons=boons,
@@ -1424,7 +1424,7 @@ class Arbiter:
     def _run_end_of_era_phase(self, state: "SettlementState") -> list[dict]:
         print(f"\n  ── The Chronicle Closes ──")
         era_outputs_so_far = self._logger.get_recent(self._memory_window * 4)
-        print(f"    → GM writing era summary...", end="", flush=True)
+        self._vprint(f"    → GM writing era summary...", end="", flush=True)
         gm_output = self._gm.narrate_end_of_era(
             {}, state.era, era_outputs_so_far, state.summary(),
             getattr(self, "_last_challenge_result", {})
