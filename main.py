@@ -34,6 +34,72 @@ def _vprint(*args, **kwargs):
         print(*args, **kwargs)
 
 
+def compute_goal_costs(goals: dict, cultures: dict | None = None) -> dict:
+    """
+    Compute total tokens needed per color for each goal, considering
+    current culture levels. Returns dict with per-goal and aggregate costs.
+
+    Each goal entry: {total_cost: {color: amount}, remaining_levels: [...]}
+    """
+    from mechanics.cultures import CULTURE_TREE, get_cost
+    cultures = cultures or {}
+
+    result = {}
+
+    # Primary: need all levels from current+1 up to goal level
+    p = goals.get("primary", {})
+    if p.get("category"):
+        cat = p["category"]
+        target_lvl = p["level"]
+        current = cultures.get(cat, {}).get("level", 0)
+        cost: dict[str, int] = {}
+        levels = []
+        for lvl in range(current + 1, target_lvl + 1):
+            lvl_cost = get_cost(cat, lvl)
+            for c, n in lvl_cost.items():
+                cost[c] = cost.get(c, 0) + n
+            levels.append(lvl)
+        result["primary"] = {"category": cat, "target_level": target_lvl, "total_cost": cost, "remaining_levels": levels}
+
+    # Secondary: each needs all levels from current+1 up to goal level
+    for i, s in enumerate(goals.get("secondary", [])):
+        if s.get("category"):
+            cat = s["category"]
+            target_lvl = s["level"]
+            current = cultures.get(cat, {}).get("level", 0)
+            cost = {}
+            levels = []
+            for lvl in range(current + 1, target_lvl + 1):
+                lvl_cost = get_cost(cat, lvl)
+                for c, n in lvl_cost.items():
+                    cost[c] = cost.get(c, 0) + n
+                levels.append(lvl)
+            result[f"secondary_{i}"] = {"category": cat, "target_level": target_lvl, "total_cost": cost, "remaining_levels": levels}
+
+    # Tertiary: all 3 levels of the category
+    t = goals.get("tertiary", {})
+    if t.get("category"):
+        cat = t["category"]
+        current = cultures.get(cat, {}).get("level", 0)
+        cost = {}
+        levels = []
+        for lvl in range(current + 1, 4):
+            lvl_cost = get_cost(cat, lvl)
+            for c, n in lvl_cost.items():
+                cost[c] = cost.get(c, 0) + n
+            levels.append(lvl)
+        result["tertiary"] = {"category": cat, "target_level": 3, "total_cost": cost, "remaining_levels": levels}
+
+    # Aggregate: total across all goals
+    aggregate: dict[str, int] = {}
+    for goal_data in result.values():
+        for c, n in goal_data["total_cost"].items():
+            aggregate[c] = aggregate.get(c, 0) + n
+    result["aggregate"] = aggregate
+
+    return result
+
+
 def _empty_tokens() -> dict:
     return {"red": 0, "blue": 0, "green": 0, "orange": 0, "pink": 0}
 
@@ -56,6 +122,11 @@ def build_faction_data(ideology_name: str, faction_index: int) -> dict:
         "needs_reconsideration": False,
         "culture_preferences": id_.get("culture_preferences", {}),
         "influence": 0,
+        "goal_costs": compute_goal_costs({
+            "primary": id_["primary"],
+            "secondary": id_["secondary"],
+            "tertiary": id_["tertiary"],
+        }),
     }
 
 

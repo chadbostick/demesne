@@ -144,7 +144,7 @@ class Arbiter:
             tokens = dict(faction["tokens"])
 
             # ── Decide strategy ────────────────────────────────────────────
-            # 1. Check if make exchange enables a goal purchase (skip LLM if so)
+            # 1. Check if make exchange enables a goal purchase (skip roll)
             make_override = self._should_make_instead(faction, state)
             if make_override:
                 stance = "make"
@@ -155,27 +155,12 @@ class Arbiter:
                 faction["needs_reconsideration"] = False
                 self._vprint(f"    [{fname} → MAKE: {make_override['reason']}]")
             else:
-                # 2. Reconsider stance via LLM if triggered
-                if faction.get("needs_reconsideration", False):
-                    context = MemoryContext.build(state, self._logger, self._memory_window, fname)
-                    self._vprint(f"\n    → {fname} reconsidering stance (LLM)...", end="", flush=True)
-                    output = agent.run_strategy(context, state.era, state._data["available_strategies"], cultures=state.cultures)
-                    self._vprint(" done.\n")
-                    self._vprint(output.content)
-                    self._logger.log(output)
-                    outputs.append(output.to_dict())
-                    choice = agent.parse_strategy_choice(output)
-                    new_stance = choice.get("stance", "").lower()
-                    if new_stance:
-                        faction["current_stance"] = new_stance
-                    faction["needs_reconsideration"] = False
-                    pause(f"  ── {fname} reconsideration done. Press Space/Enter to continue or Esc to quit ──", era=state.era)
-
-                # 3. Resolve stance to strategy + color
-                stance = faction.get("current_stance", "pursue_primary")
-                strategy, color = self._stance_to_strategy(stance, faction, state)
+                # 2. Smart goal pursuit: pick the strategy that covers the biggest shortfall
+                strategy, color, pursuit_reason = self._pick_best_strategy(faction, state)
+                stance = f"pursuing_{color}"
                 _make_receive_color = None
                 _make_give = None
+                self._vprint(f"    [{fname} → {strategy} ({color}): {pursuit_reason}]")
 
             color_level = state.get_color_level(color)
             cu = state.color_upgrades[color]
@@ -367,6 +352,90 @@ class Arbiter:
 
         color = color_for_cat(cat)
         return strat_for_color(color), color
+
+    def _pick_best_strategy(
+        self, faction: dict, state: "SettlementState"
+    ) -> tuple[str, str, str]:
+        """
+        Smart goal pursuit: pick the strategy that gets the faction closest
+        to their next culture purchase.
+
+        Returns (strategy_name, color, reason).
+
+        Logic:
+        1. Recompute goal costs based on current culture state
+        2. For each goal, compute the next level's shortfall per color
+        3. Pick the goal whose next level needs the fewest additional tokens
+        4. Earn the color with the biggest shortfall for that goal
+        """
+        from main import compute_goal_costs
+        tokens = dict(faction["tokens"])
+        goals = faction.get("goals", {})
+        cultures = state.cultures
+
+        # Recompute costs against current culture state
+        goal_costs = compute_goal_costs(goals, cultures)
+        faction["goal_costs"] = goal_costs  # update stored costs
+
+        color_to_strat = {v["token_color"]: k for k, v in BASE_STRATEGIES.items()}
+
+        best_goal = None
+        best_delta = float("inf")
+        best_shortfall_color = None
+        best_reason = ""
+
+        for goal_key in ["primary", "secondary_0", "secondary_1", "tertiary"]:
+            goal_data = goal_costs.get(goal_key)
+            if not goal_data or not goal_data.get("remaining_levels"):
+                continue
+
+            cat = goal_data["category"]
+            next_lvl = goal_data["remaining_levels"][0]
+
+            # Get cost for just the next level
+            from mechanics.cultures import get_cost, can_purchase
+            if not can_purchase(cat, next_lvl, cultures):
+                continue
+            cost = get_cost(cat, next_lvl)
+
+            # Compute total shortfall (how many tokens needed across all colors)
+            total_short = 0
+            worst_color = None
+            worst_short = 0
+            for c, needed in cost.items():
+                have = tokens.get(c, 0)
+                short = max(0, needed - have)
+                total_short += short
+                if short > worst_short:
+                    worst_short = short
+                    worst_color = c
+
+            if total_short == 0:
+                # Can already afford this — investment phase will buy it
+                continue
+
+            if total_short < best_delta:
+                best_delta = total_short
+                best_goal = goal_key
+                best_shortfall_color = worst_color
+                best_reason = f"{goal_key}: {cat} L{next_lvl} needs {total_short} more tokens (worst: {worst_short} {worst_color})"
+
+        if best_shortfall_color and best_shortfall_color in color_to_strat:
+            strategy = color_to_strat[best_shortfall_color]
+            return strategy, best_shortfall_color, best_reason
+
+        # Fallback: earn the color with the largest aggregate need
+        aggregate = goal_costs.get("aggregate", {})
+        if aggregate:
+            # Pick the color where we have the biggest gap
+            biggest_gap_color = max(
+                aggregate.keys(),
+                key=lambda c: max(0, aggregate[c] - tokens.get(c, 0))
+            )
+            if biggest_gap_color in color_to_strat:
+                return color_to_strat[biggest_gap_color], biggest_gap_color, f"aggregate need: {biggest_gap_color}"
+
+        return "pray", "red", "fallback"
 
     def _pick_bonus_colors(
         self, faction: dict, tokens: dict, base_color: str,
@@ -1054,14 +1123,28 @@ class Arbiter:
                 self._vprint(f"      [Score: {option}={score}, {other_option}={other_score}]")
 
                 # Show per-faction token state and willingness
+                # A faction is willing if:
+                # 1. The category is in their goals AND
+                # 2. They can't afford the purchase solo (that's already filtered) AND
+                # 3. Contributing tokens doesn't cost them more than buying solo would
                 willing_factions = []
                 for f in state.factions:
                     tok_str = ", ".join(f"{c}:{n}" for c, n in f["tokens"].items() if n > 0) or "none"
                     benefits = self._faction_benefits_from(f, cat)
-                    status = "willing" if benefits else "unwilling (not their goal)"
-                    self._vprint(f"      {f['name']}: [{tok_str}] — {status}")
                     if benefits:
-                        willing_factions.append(f)
+                        # Check if their contribution is less than what they'd pay solo
+                        f_contribution = sum(
+                            min(f["tokens"].get(c, 0), n) for c, n in cost.items()
+                        )
+                        solo_cost = sum(cost.values())
+                        if f_contribution <= solo_cost:
+                            status = f"willing (contributes {f_contribution}/{solo_cost})"
+                            willing_factions.append(f)
+                        else:
+                            status = "unwilling (cheaper solo)"
+                    else:
+                        status = "unwilling (not their goal)"
+                    self._vprint(f"      {f['name']}: [{tok_str}] — {status}")
 
                 if not willing_factions:
                     self._vprint(f"    → SKIPPED — no faction has {cat} in their goals")
