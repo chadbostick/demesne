@@ -82,11 +82,11 @@ BASE_MAKE_OPTIONS: dict = {
     "workyard":   {"exchange_color": "pink"},
 }
 
-# Make exchange: faction chooses N tokens to spend, receives N + color_level back.
-# L0: spend 2 → get 2  |  L1: spend 2 → get 3  |  L2: spend 2 → get 4  |  L3: spend 2 → get 5
+# Make exchange: faction chooses N tokens to spend, receives N * (level + 1) back.
+# L0: spend 2 → get 2  |  L1: spend 2 → get 4  |  L2: spend 2 → get 6  |  L3: spend 2 → get 8
 def make_receive_for_level(color_level: int, give: int) -> int:
-    """Return receive count for a make exchange. Formula: N + color_level."""
-    return give + color_level
+    """Return receive count for a make exchange. Formula: N * (level + 1)."""
+    return give * (color_level + 1)
 
 
 def apply_make_exchange(
