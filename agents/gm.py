@@ -20,28 +20,54 @@ class GMAgent(BaseAgent):
         round_num: int,
         challenge_text: str,
         state_summary: str,
+        previous_chronicle: str | None = None,
+        strategy_summary: str | None = None,
+        previous_challenges: list[str] | None = None,
     ) -> AgentOutput:
+        prev_block = ""
+        if previous_chronicle:
+            prev_block = f"\nWHAT CAME BEFORE (the previous generation's legacy):\n{previous_chronicle[:400]}\n"
+
+        strat_block = ""
+        if strategy_summary:
+            strat_block = f"\nWHAT THE PEOPLE WERE DOING WHEN THE CRISIS STRUCK:\n{strategy_summary[:400]}\n"
+
+        prev_challenges_block = ""
+        if previous_challenges:
+            prev_challenges_block = (
+                "\nPREVIOUS CRISES THIS SETTLEMENT HAS FACED:\n"
+                + "\n".join(f"  - Gen {i+1}: {c}" for i, c in enumerate(previous_challenges))
+                + "\n\nIf this new crisis has a thematic or causal connection to a previous one "
+                "(e.g., both are magical, both relate to the same resource, or the current crisis "
+                "is a consequence of how a previous one was resolved), draw that connection. "
+                "History rhymes.\n"
+            )
+
         prompt = f"""\
 You are the chronicler of a fantasy settlement. You record history as it unfolds.
 
 SETTLEMENT STATE:
 {state_summary}
-
+{prev_block}{strat_block}{prev_challenges_block}
 THE CRISIS OF THIS GENERATION: "{challenge_text}"
 
-This is not a brief event — this is the defining crisis of an entire generation. It unfolds over \
-years or decades and will be remembered for centuries. Make it specific to THIS settlement: its \
-geography, terrain, established cultures, structures, and people. If the event seems impossible \
-for this region (e.g. "Tsunami" in a desert), interpret it as a metaphor or find a creative way \
-it manifests here.
+Consider HOW this crisis connects to what came before. Is it:
+- A CONSEQUENCE of the settlement's choices? (They ignored warnings, overextended, \
+  neglected something vital, or their success created new vulnerabilities)
+- An UNKNOWABLE disruption? (Something no one could have predicted that forces the \
+  community to rethink everything they assumed was true)
+- A FORETOLD reckoning? (Signs were there — did the people prepare, ignore them, \
+  or reject the warnings?)
 
-In 3-5 sentences, chronicle what befell the people. Name specific places, describe what families \
-experienced, how daily life was disrupted across years. Set the stakes in generational terms: \
-what will be lost if this is not overcome? What will the children inherit? Do not resolve the \
-crisis yet — only describe its weight.
+The best history reads like inevitability in hindsight. Plant the seeds: reference specific \
+decisions, structures, or cultural shifts from earlier that made this crisis hit harder — or \
+that gave the people tools they didn't know they'd need.
 
-VOICE CONSTRAINT: Write as a historian looking back across decades. No tokens, rolls, victory \
-points, or game mechanics. No metagaming language.
+In 3-5 sentences, chronicle what befell the people. Name specific places and historical \
+figures. Set the stakes in generational terms. Do not resolve the crisis yet.
+
+VOICE CONSTRAINT: Write as a historian looking back across decades. No tokens, rolls, \
+victory points, or game mechanics.
 """
         return self._call_llm(prompt, round_num, "challenge_narration")
 
@@ -82,9 +108,17 @@ OUTCOME: The settlement {outcome_word}.
 {boon_line}
 
 This crisis defined a generation. Write 3-5 sentences describing what happened over the years \
-it took to resolve. How did families endure? What was permanently changed? If they prevailed, \
-what scars remain alongside the triumph? If they failed, what was lost that can never return? \
-Describe consequences that children will grow up knowing.
+it took to resolve.
+
+Connect the outcome to the settlement's larger arc:
+- If they PREVAILED: What earlier choices, structures, or cultural values gave them the \
+  strength to endure? What scars remain alongside the triumph? What new vulnerability has \
+  their success created? (Every victory plants the seeds of a future crisis.)
+- If they FAILED: What weakness was exposed — was it structural, cultural, or leadership? \
+  What was permanently lost? What desperate adaptation will define the next generation?
+
+Reference specific named historical figures, structures, and places. Show how this crisis \
+transformed not just the settlement's condition, but its character.
 
 VOICE CONSTRAINT: Write as a historian looking back across decades. No tokens, rolls, \
 victory points, or game mechanics.
@@ -309,7 +343,11 @@ SETTLEMENT STATE:
 
 A generation has passed. Write 3-4 sentences summarizing what the settlement's people accomplished \
 across these decades. Describe the work of a lifetime: what was built, what traditions took root, \
-how the landscape changed under sustained effort. What will this generation be remembered for?
+how the landscape changed under sustained effort.
+
+End with a hint of what's unresolved or fragile — something the people haven't noticed, \
+something they're neglecting, or a tension that's growing beneath the surface. The reader \
+should feel that prosperity and crisis are two sides of the same coin.
 
 VOICE CONSTRAINT: Write as a historian. No tokens, rolls, victory points, strategies, or game \
 mechanics. Ground every observation in the lived reality of generations.

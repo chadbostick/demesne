@@ -73,6 +73,7 @@ class Arbiter:
         self._era_chronicle: list[str] = []  # short summary per completed era
         self._era_names: list[str] = []       # era period names used so far
         self._last_faction_narratives: dict[str, str] = {}  # faction_name → last narrative
+        self._previous_challenges: list[str] = []  # challenge events from past eras
 
     def _vprint(self, *args, **kwargs):
         """Print only if verbose mode is on."""
@@ -320,6 +321,7 @@ class Arbiter:
             print(gm_output.content)
             self._logger.log(gm_output)
             outputs.append(gm_output.to_dict())
+            self._last_strategy_summary = gm_output.content[:400]
             pause("  ── Strategy phase complete. Press Space/Enter to continue or Esc to quit ──", era=state.era)
 
         return outputs
@@ -1245,17 +1247,23 @@ class Arbiter:
 
         # GM narrates the challenge with regional specifics
         self._vprint(f"\n    → GM describing the challenge...", end="", flush=True)
+        prev_chron = self._era_chronicle[-1] if self._era_chronicle else None
+        strat_sum = getattr(self, "_last_strategy_summary", None)
         gm_challenge = self._gm.narrate_challenge(
             context={},
             round_num=state.era,
             challenge_text=challenge_event,
             state_summary=state.summary(),
+            previous_chronicle=prev_chron,
+            strategy_summary=strat_sum,
+            previous_challenges=list(self._previous_challenges) if self._previous_challenges else None,
         )
         print(" done.\n")
         challenge_text = gm_challenge.content
         print(challenge_text)
         self._logger.log(gm_challenge)
         outputs.append(gm_challenge.to_dict())
+        self._previous_challenges.append(challenge_event)
 
         state.set_challenge(challenge_text)
         self._logger.log_event("challenge_drawn", era=state.era,
