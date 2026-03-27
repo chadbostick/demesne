@@ -612,6 +612,7 @@ class Arbiter:
             print("\n    [Reconsideration triggered: cooperative purchase this era]")
 
         # Recalculate VP for all factions
+        from mechanics.scoring import option_is_unlocked
         scores = score_all_factions(state.factions, state.cultures)
         print("\n    VP totals:")
         for faction in state.factions:
@@ -625,12 +626,23 @@ class Arbiter:
             p_cat = p.get("category", "")
             p_lvl = p.get("level", 0)
             p_opt = p.get("option", "")
-            cur_lvl = state.cultures.get(p_cat, {}).get("level", 0)
             if p_cat and p_lvl:
-                if vp >= 30:
-                    notes.append(f"primary ✓")
+                if option_is_unlocked(state.cultures, p_cat, p_lvl, p_opt):
+                    notes.append(f"primary ✓ {p_opt} (+30 VP)")
                 else:
+                    cur_lvl = state.cultures.get(p_cat, {}).get("level", 0)
                     notes.append(f"primary needs {p_cat} L{p_lvl} '{p_opt}' (currently L{cur_lvl})")
+            # Secondary goal progress
+            for i, s in enumerate(goals.get("secondary", []), 1):
+                s_cat = s.get("category", "")
+                s_lvl = s.get("level", 0)
+                s_opt = s.get("option", "")
+                if s_cat and s_lvl:
+                    if option_is_unlocked(state.cultures, s_cat, s_lvl, s_opt):
+                        notes.append(f"secondary{i} ✓ {s_opt} (+15 VP)")
+                    else:
+                        cur_lvl = state.cultures.get(s_cat, {}).get("level", 0)
+                        notes.append(f"secondary{i} needs {s_cat} L{s_lvl} '{s_opt}' (L{cur_lvl})")
             # Tertiary progress
             t = goals.get("tertiary", {})
             t_cat = t.get("category", "")
@@ -638,6 +650,8 @@ class Arbiter:
                 t_lvl = state.cultures.get(t_cat, {}).get("level", 0)
                 if t_lvl > 0:
                     notes.append(f"tertiary {t_cat} L{t_lvl} (+{t_lvl * 10} VP)")
+                else:
+                    notes.append(f"tertiary {t_cat} (L0, no VP yet)")
             note_str = f"  [{'; '.join(notes)}]" if notes else ""
             print(f"      {fname}: {vp} VP{note_str}")
 
