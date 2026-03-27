@@ -361,25 +361,28 @@ class Arbiter:
         self, faction: dict, state: "SettlementState"
     ) -> tuple[str, str, str]:
         """
-        Smart goal pursuit: pick the strategy that gets the faction closest
-        to their next culture purchase.
+        Smart goal pursuit with coalition awareness.
 
         Returns (strategy_name, color, reason).
 
         Logic:
         1. Recompute goal costs based on current culture state
         2. For each goal, compute the next level's shortfall per color
-        3. Pick the goal whose next level needs the fewest additional tokens
-        4. Earn the color with the biggest shortfall for that goal
+        3. Apply coalition bonus: if allies exist for this category,
+           reduce effective shortfall (allies will contribute tokens)
+        4. Pick the goal with lowest effective shortfall
+        5. Earn the color with the biggest gap for that goal
         """
         from main import compute_goal_costs
         tokens = dict(faction["tokens"])
         goals = faction.get("goals", {})
         cultures = state.cultures
+        coalition_plan = faction.get("coalition_plan", {})
+        coalition_cats = {c["category"]: c for c in coalition_plan.get("coalitions", [])}
 
         # Recompute costs against current culture state
         goal_costs = compute_goal_costs(goals, cultures)
-        faction["goal_costs"] = goal_costs  # update stored costs
+        faction["goal_costs"] = goal_costs
 
         color_to_strat = {v["token_color"]: k for k, v in BASE_STRATEGIES.items()}
 
@@ -396,13 +399,12 @@ class Arbiter:
             cat = goal_data["category"]
             next_lvl = goal_data["remaining_levels"][0]
 
-            # Get cost for just the next level
             from mechanics.cultures import get_cost, can_purchase
             if not can_purchase(cat, next_lvl, cultures):
                 continue
             cost = get_cost(cat, next_lvl)
 
-            # Compute total shortfall (how many tokens needed across all colors)
+            # Compute total shortfall
             total_short = 0
             worst_color = None
             worst_short = 0
@@ -415,23 +417,43 @@ class Arbiter:
                     worst_color = c
 
             if total_short == 0:
-                # Can already afford this — investment phase will buy it
                 continue
 
-            if total_short < best_delta:
-                best_delta = total_short
+            # Coalition bonus: if allies exist, they'll contribute tokens
+            # in cooperative purchase, so our effective shortfall is lower
+            effective_short = total_short
+            coalition = coalition_cats.get(cat)
+            if coalition:
+                num_allies = len(coalition["allies"])
+                # Estimate: each ally contributes ~1-2 tokens per era toward this category
+                # So coalition categories are effectively cheaper
+                coalition_discount = min(total_short - 1, num_allies)  # can't discount to 0
+                effective_short = max(1, total_short - coalition_discount)
+                suffix = f" (coalition: {num_allies} allies)"
+            else:
+                suffix = " (solo)"
+
+            if effective_short < best_delta:
+                best_delta = effective_short
                 best_goal = goal_key
                 best_shortfall_color = worst_color
-                best_reason = f"{goal_key}: {cat} L{next_lvl} needs {total_short} more tokens (worst: {worst_short} {worst_color})"
+                best_reason = f"{goal_key}: {cat} L{next_lvl} needs {total_short} tokens, effective={effective_short}{suffix}"
 
         if best_shortfall_color and best_shortfall_color in color_to_strat:
             strategy = color_to_strat[best_shortfall_color]
             return strategy, best_shortfall_color, best_reason
 
-        # Fallback: earn the color with the largest aggregate need
+        # Fallback: prioritize coalition categories from priority_order
+        priority_order = coalition_plan.get("priority_order", [])
         aggregate = goal_costs.get("aggregate", {})
+        if priority_order and aggregate:
+            for cat in priority_order:
+                color = CULTURE_STRATEGY_COLOR.get(cat)
+                if color and aggregate.get(color, 0) > tokens.get(color, 0):
+                    if color in color_to_strat:
+                        return color_to_strat[color], color, f"coalition priority: {cat}"
+
         if aggregate:
-            # Pick the color where we have the biggest gap
             biggest_gap_color = max(
                 aggregate.keys(),
                 key=lambda c: max(0, aggregate[c] - tokens.get(c, 0))

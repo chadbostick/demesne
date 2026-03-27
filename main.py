@@ -100,6 +100,123 @@ def compute_goal_costs(goals: dict, cultures: dict | None = None) -> dict:
     return result
 
 
+def compute_coalitions(factions_data: list[dict]) -> dict[str, dict]:
+    """
+    Compute coalition heuristics for each faction based on goal overlaps.
+    Returns {faction_name: {coalitions, solo_targets, conflicts}}.
+
+    coalitions: list of {category, level, allies, reason}
+    solo_targets: categories where this faction works alone
+    conflicts: list of {category, level, rival, reason}
+    """
+    from mechanics.cultures import CULTURE_TREE, get_cost
+    from collections import defaultdict
+
+    # Build category → interested factions map
+    cat_interest: dict[str, list[dict]] = defaultdict(list)
+    for f in factions_data:
+        goals = f.get("goals", {})
+        fname = f["name"]
+        p = goals.get("primary", {})
+        if p.get("category"):
+            cat_interest[p["category"]].append({
+                "faction": fname, "type": "primary", "level": p["level"],
+                "option": p["option"], "vp": 30,
+            })
+        for s in goals.get("secondary", []):
+            if s.get("category"):
+                cat_interest[s["category"]].append({
+                    "faction": fname, "type": "secondary", "level": s["level"],
+                    "option": s["option"], "vp": 15,
+                })
+        t = goals.get("tertiary", {})
+        if t.get("category"):
+            cat_interest[t["category"]].append({
+                "faction": fname, "type": "tertiary", "level": 3,
+                "option": "any", "vp": 30,
+            })
+
+    result: dict[str, dict] = {}
+    for f in factions_data:
+        fname = f["name"]
+        coalitions = []
+        solo_targets = []
+        conflicts = []
+
+        goals = f.get("goals", {})
+        my_cats = set()
+        p = goals.get("primary", {})
+        if p.get("category"):
+            my_cats.add(p["category"])
+        for s in goals.get("secondary", []):
+            if s.get("category"):
+                my_cats.add(s["category"])
+        t = goals.get("tertiary", {})
+        if t.get("category"):
+            my_cats.add(t["category"])
+
+        for cat in my_cats:
+            others_in_cat = [e for e in cat_interest[cat] if e["faction"] != fname]
+            if not others_in_cat:
+                solo_targets.append(cat)
+                continue
+
+            # Find allies (same option preference) and rivals (opposing options)
+            my_entries = [e for e in cat_interest[cat] if e["faction"] == fname]
+            my_options = {e["option"] for e in my_entries if e["option"] != "any"}
+
+            allies = []
+            rivals = []
+            for other in others_in_cat:
+                if other["option"] == "any" or not my_options:
+                    # Tertiary — they benefit from any level, so they're an ally
+                    allies.append(other)
+                elif other["option"] in my_options:
+                    allies.append(other)
+                else:
+                    # Check if their option directly opposes ours
+                    # They want something different at the same level
+                    for my_e in my_entries:
+                        if my_e["level"] == other["level"] and my_e["option"] != other["option"] and my_e["option"] != "any":
+                            rivals.append(other)
+                            break
+                    else:
+                        # Different level or tertiary — still an ally at prerequisite levels
+                        allies.append(other)
+
+            if allies:
+                ally_names = list(set(a["faction"] for a in allies))
+                total_vp = sum(a["vp"] for a in allies) + sum(e["vp"] for e in my_entries)
+                coalitions.append({
+                    "category": cat,
+                    "allies": ally_names,
+                    "total_vp_at_stake": total_vp,
+                    "reason": f"{len(ally_names)+1} factions benefit from {cat} advancement",
+                })
+            else:
+                solo_targets.append(cat)
+
+            for rival in rivals:
+                conflicts.append({
+                    "category": cat,
+                    "rival": rival["faction"],
+                    "their_option": rival["option"],
+                    "reason": f"opposing options at {cat} L{rival['level']}",
+                })
+
+        # Sort coalitions by total VP at stake (highest priority first)
+        coalitions.sort(key=lambda c: c["total_vp_at_stake"], reverse=True)
+
+        result[fname] = {
+            "coalitions": coalitions,
+            "solo_targets": solo_targets,
+            "conflicts": conflicts,
+            "priority_order": [c["category"] for c in coalitions] + solo_targets,
+        }
+
+    return result
+
+
 def _empty_tokens() -> dict:
     return {"red": 0, "blue": 0, "green": 0, "orange": 0, "pink": 0}
 
@@ -444,6 +561,23 @@ def main() -> None:
                 ideology=agent.faction_data["ideology"], organization_type=org_type,
                 description=description)
         pause(f"  ── {agent.faction_data['name']} introduced. Press Space/Enter to continue or Esc to quit ──")
+
+    # ── Compute coalition heuristics ─────────────────────────────────────────
+    coalition_map = compute_coalitions(state.factions)
+    for f in state.factions:
+        f["coalition_plan"] = coalition_map.get(f["name"], {})
+    for agent in faction_agents:
+        agent.faction_data = state.get_faction(agent.faction_data["name"])
+    _vprint("\n  [COALITION ANALYSIS]")
+    for fname, plan in coalition_map.items():
+        _vprint(f"  {fname}:")
+        for c in plan.get("coalitions", []):
+            _vprint(f"    COLLAB {c['category']}: with {', '.join(c['allies'])} ({c['total_vp_at_stake']} VP at stake)")
+        for cat in plan.get("solo_targets", []):
+            _vprint(f"    SOLO   {cat}")
+        for conf in plan.get("conflicts", []):
+            _vprint(f"    RIVAL  {conf['category']}: vs {conf['rival']} ({conf['reason']})")
+    logger.log_event("coalition_analysis", era=0, coalitions=coalition_map)
 
     # ── Settlement naming (leading faction, LLM) ─────────────────────────────
     leader_agent = next(a for a in faction_agents if a.faction_data["name"] == state.leading_faction)
