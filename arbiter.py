@@ -684,7 +684,7 @@ class Arbiter:
         )
         print(
             f"      [{color.upper()} L{new_level}] Make renamed: {old_make!r} → {new_make_n!r}"
-            f"  (exchange formula: spend N → receive N+{new_level})"
+            f"  (exchange formula: spend N → receive N*{new_level + 1})"
         )
         self._logger.log(rename_out)
         outputs.append(rename_out.to_dict())
