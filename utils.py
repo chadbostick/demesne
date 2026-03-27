@@ -3,8 +3,10 @@ import tty
 import termios
 
 
-def pause(message: str = "  ── Press Space/Enter to continue or Esc to quit ──") -> None:
-    """Block until the user presses Space, Enter, or Esc. Esc exits the process."""
+def pause(message: str = "  ── Press Space/Enter to continue or Esc to quit ──", era: int = 0) -> None:
+    """Block until the user presses Space, Enter, or Esc. Esc exits the process. Skips during era 1."""
+    if era <= 1:
+        return
     print(f"\n{message} ", end="", flush=True)
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)

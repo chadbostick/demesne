@@ -94,7 +94,7 @@ class Arbiter:
             outputs = self._run_end_of_era_phase(state)
         else:
             return []
-        pause()
+        pause(era=state.era)
         return outputs
 
     # ── Strategy Phase ────────────────────────────────────────────────────────
@@ -125,7 +125,7 @@ class Arbiter:
                 if new_stance:
                     faction["current_stance"] = new_stance
                 faction["needs_reconsideration"] = False
-                pause(f"  ── {fname} reconsideration done. Press Space/Enter to continue or Esc to quit ──")
+                pause(f"  ── {fname} reconsideration done. Press Space/Enter to continue or Esc to quit ──", era=state.era)
 
             # ── Mechanical execution ─────────────────────────────────────────
             stance = faction.get("current_stance", "pursue_primary")
@@ -174,7 +174,7 @@ class Arbiter:
                         outputs.append(narrative_out.to_dict())
                         _faction_summaries.append({"name": fname, "activity": f"building ({custom_make_name})", "tokens_earned": 0})
                         _faction_narratives.append(narrative_out.content)
-                        pause(f"  ── {fname} done. Press Space/Enter to continue or Esc to quit ──")
+                        pause(f"  ── {fname} done. Press Space/Enter to continue or Esc to quit ──", era=state.era)
                         continue
                 # Fall through to normal execution if make not possible
 
@@ -206,7 +206,7 @@ class Arbiter:
             _faction_summaries.append({"name": fname, "activity": _STRATEGY_ACTIVITY.get(strategy, strategy), "tokens_earned": tokens_earned})
             _faction_narratives.append(narrative_out.content)
 
-            pause(f"  ── {fname} done. Press Space/Enter to continue or Esc to quit ──")
+            pause(f"  ── {fname} done. Press Space/Enter to continue or Esc to quit ──", era=state.era)
 
         # ── GM strategy summary narration ─────────────────────────────────────
         narration_mode = config.STRATEGY_NARRATION_MODE
@@ -223,7 +223,7 @@ class Arbiter:
             print(gm_output.content)
             self._logger.log(gm_output)
             outputs.append(gm_output.to_dict())
-            pause("  ── Strategy phase complete. Press Space/Enter to continue or Esc to quit ──")
+            pause("  ── Strategy phase complete. Press Space/Enter to continue or Esc to quit ──", era=state.era)
 
         return outputs
 
@@ -475,7 +475,7 @@ class Arbiter:
                 tok_str = ", ".join(f"{c}:{n}" for c, n in tokens.items())
                 print(f"      [Tokens now: {tok_str}]")
                 state.update_faction_tokens(fname, tokens)
-                pause(f"  ── {fname} done. Press Space/Enter to continue or Esc to quit ──")
+                pause(f"  ── {fname} done. Press Space/Enter to continue or Esc to quit ──", era=state.era)
             else:
                 tok_str = ", ".join(f"{c}:{n}" for c, n in tokens.items())
                 print(f"      [No purchases made. Tokens: {tok_str}]")
@@ -733,7 +733,7 @@ class Arbiter:
                 color = CULTURE_TREE[cat]["unlocks_color"]
                 self._check_color_level_up(state, color, cat, option, top_agent, [])
 
-                pause("  ── Cooperative purchase made. Press Space/Enter to continue or Esc to quit ──")
+                pause("  ── Cooperative purchase made. Press Space/Enter to continue or Esc to quit ──", era=state.era)
                 break  # restart outer while-loop with updated state
 
             if not bought_one:
@@ -1010,7 +1010,7 @@ class Arbiter:
             self._logger.log(narrative_output)
             outputs.append(narrative_output.to_dict())
 
-        pause("  ── Challenge resolved. Press Space/Enter to continue or Esc to quit ──")
+        pause("  ── Challenge resolved. Press Space/Enter to continue or Esc to quit ──", era=state.era)
         self._last_challenge_result = challenge_result
         return outputs
 
