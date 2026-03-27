@@ -47,7 +47,13 @@ class Arbiter:
         self._factions = faction_agents
         self._gm = gm_agent
         self._logger = logger
+        self._verbose = config.VERBOSE
         self._memory_window = memory_window or config.MEMORY_WINDOW
+
+    def _vprint(self, *args, **kwargs):
+        """Print only if verbose mode is on."""
+        if self._verbose:
+            print(*args, **kwargs)
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -112,7 +118,7 @@ class Arbiter:
                 _make_receive_color = make_override["receive_color"]
                 _make_give = make_override["give"]
                 faction["needs_reconsideration"] = False
-                print(f"    [{fname} → MAKE: {make_override['reason']}]")
+                self._vprint(f"    [{fname} → MAKE: {make_override['reason']}]")
             else:
                 # 2. Reconsider stance via LLM if triggered
                 if faction.get("needs_reconsideration", False):
@@ -152,11 +158,11 @@ class Arbiter:
                         receive_colors = [receive_color] * receive
                         tokens = apply_make_exchange(tokens, color, give, receive, receive_colors)
                         tok_str = ", ".join(f"{c}:{n}" for c, n in tokens.items())
-                        print(
+                        self._vprint(
                             f"    {fname} [{custom_make_name}] gave {give} {color},"
                             f" received {receive} {receive_color}"
                         )
-                        print(f"      [Tokens now: {tok_str}]")
+                        self._vprint(f"      [Tokens now: {tok_str}]")
                         state.update_faction_tokens(fname, tokens)
                         self._logger.log_event("make_exchange", era=state.era,
                             faction=fname, give_color=color, give_amount=give,
@@ -217,10 +223,10 @@ class Arbiter:
                 tokens = award_tokens(tokens, color, base_count, 0)
                 bonus_note = ""
             tokens_earned = base_count + bonus_count
-            print(f"    {fname} [{stance}→{custom_strategy_name}] rolled {dice_display} → +{base_count} {color}{bonus_note}")
+            self._vprint(f"    {fname} [{stance}→{custom_strategy_name}] rolled {dice_display} → +{base_count} {color}{bonus_note}")
 
             tok_str = ", ".join(f"{c}:{n}" for c, n in tokens.items())
-            print(f"      [Tokens now: {tok_str}]")
+            self._vprint(f"      [Tokens now: {tok_str}]")
             state.update_faction_tokens(fname, tokens)
             self._logger.log_event("strategy_roll", era=state.era,
                 faction=fname, stance=stance, strategy=custom_strategy_name,
@@ -553,7 +559,7 @@ class Arbiter:
 
             affordable = self._affordable_upgrades(tokens, state.cultures)
             if not affordable:
-                print(f"\n    [SKIP: {fname} cannot afford any upgrade]")
+                self._vprint(f"\n    [SKIP: {fname} cannot afford any upgrade]")
                 continue
 
             context = MemoryContext.build(state, self._logger, self._memory_window, fname)
@@ -570,25 +576,25 @@ class Arbiter:
                 option = purchase.get("option", "")
 
                 if cat not in CULTURE_TREE:
-                    print(f"      [SKIP: unknown category '{cat}']")
+                    self._vprint(f"      [SKIP: unknown category '{cat}']")
                     continue
                 if not can_purchase(cat, lvl, state.cultures):
-                    print(f"      [SKIP: prerequisite not met for {cat} L{lvl}]")
+                    self._vprint(f"      [SKIP: prerequisite not met for {cat} L{lvl}]")
                     continue
 
                 cost = get_cost(cat, lvl)
                 if not self._can_afford(tokens, cost):
-                    print(f"      [SKIP: cannot afford {cat} L{lvl}]")
+                    self._vprint(f"      [SKIP: cannot afford {cat} L{lvl}]")
                     continue
 
                 valid_opts = [o.lower() for o in CULTURE_TREE[cat]["levels"][lvl]["options"]]
                 if option.lower() not in valid_opts:
-                    print(f"      [SKIP: '{option}' not valid for {cat} L{lvl}]")
+                    self._vprint(f"      [SKIP: '{option}' not valid for {cat} L{lvl}]")
                     continue
 
                 tokens = self._deduct_tokens(tokens, cost)
                 state.apply_culture_upgrade(cat, lvl, option)
-                print(f"      [UNLOCKED: {cat} L{lvl} — {option}]")
+                self._vprint(f"      [UNLOCKED: {cat} L{lvl} — {option}]")
                 purchased_any = True
                 any_purchase_made = True
                 self._logger.log_event("culture_purchase", era=state.era,
@@ -622,19 +628,19 @@ class Arbiter:
                 self._logger.log(output)
                 outputs.append(output.to_dict())
                 tok_str = ", ".join(f"{c}:{n}" for c, n in tokens.items())
-                print(f"      [Tokens now: {tok_str}]")
+                self._vprint(f"      [Tokens now: {tok_str}]")
                 state.update_faction_tokens(fname, tokens)
                 pause(f"  ── {fname} done. Press Space/Enter to continue or Esc to quit ──", era=state.era)
             else:
                 tok_str = ", ".join(f"{c}:{n}" for c, n in tokens.items())
-                print(f"      [No purchases made. Tokens: {tok_str}]")
+                self._vprint(f"      [No purchases made. Tokens: {tok_str}]")
                 state.update_faction_tokens(fname, tokens)
 
         # Reconsideration trigger
         if any_purchase_made:
             for f in state.factions:
                 f["needs_reconsideration"] = True
-            print("\n    [Reconsideration triggered: culture purchase this era]")
+            self._vprint("\n    [Reconsideration triggered: culture purchase this era]")
 
         # Cooperative purchase round
         coop_purchased = self._attempt_cooperative_purchases(state)
@@ -643,12 +649,12 @@ class Arbiter:
             # Re-trigger reconsideration if not already set
             for f in state.factions:
                 f["needs_reconsideration"] = True
-            print("\n    [Reconsideration triggered: cooperative purchase this era]")
+            self._vprint("\n    [Reconsideration triggered: cooperative purchase this era]")
 
         # Recalculate VP for all factions
         from mechanics.scoring import option_is_unlocked
         scores = score_all_factions(state.factions, state.cultures)
-        print("\n    VP totals:")
+        self._vprint("\n    VP totals:")
         for faction in state.factions:
             fname = faction["name"]
             vp = scores[fname]
@@ -687,7 +693,7 @@ class Arbiter:
                 else:
                     notes.append(f"tertiary {t_cat} (L0, no VP yet)")
             note_str = f"  [{'; '.join(notes)}]" if notes else ""
-            print(f"      {fname}: {vp} VP{note_str}")
+            self._vprint(f"      {fname}: {vp} VP{note_str}")
 
         self._logger.log_event("vp_update", era=state.era, scores=scores,
             cultures=state.to_dict()["cultures"],
@@ -845,10 +851,10 @@ class Arbiter:
         new_make_n = choice.get("make_name", "").strip() or old_make
 
         state.set_color_names(color, new_strat, new_make_n)
-        print(
+        self._vprint(
             f"      [{color.upper()} L{new_level}] Strategy renamed: {old_strategy!r} → {new_strat!r}"
         )
-        print(
+        self._vprint(
             f"      [{color.upper()} L{new_level}] Make renamed: {old_make!r} → {new_make_n!r}"
             f"  (exchange formula: spend N → receive N*{new_level + 1})"
         )
@@ -893,21 +899,21 @@ class Arbiter:
         upgrades no single faction could afford alone.
         Returns True if any cooperative purchase was made.
         """
-        print(f"\n  [COOPERATIVE INVESTMENT]")
+        self._vprint(f"\n  [COOPERATIVE INVESTMENT]")
         made_any = False
 
         while True:
             coop = self._cooperative_upgrades(state.factions, state.cultures)
             if not coop:
                 if not made_any:
-                    print(f"    No cooperative opportunities this era.")
+                    self._vprint(f"    No cooperative opportunities this era.")
                 break
 
             # Show all cooperative opportunities found
-            print(f"\n    Opportunities found: {len(coop)}")
+            self._vprint(f"\n    Opportunities found: {len(coop)}")
             for item in coop:
                 cost_str = " + ".join(f"{n} {c}" for c, n in item["cost"].items())
-                print(f"      {item['category']} L{item['level']} — {item['option']} (costs {cost_str})")
+                self._vprint(f"      {item['category']} L{item['level']} — {item['option']} (costs {cost_str})")
 
             # Show combined token pool
             combined: dict = {}
@@ -915,7 +921,7 @@ class Arbiter:
                 for c, n in f["tokens"].items():
                     combined[c] = combined.get(c, 0) + n
             combined_str = ", ".join(f"{c}:{n}" for c, n in combined.items() if n > 0)
-            print(f"    Combined token pool: [{combined_str}]")
+            self._vprint(f"    Combined token pool: [{combined_str}]")
 
             # Deduplicate: one attempt per category+level, pick the option with more faction support
             seen: set = set()
@@ -937,7 +943,7 @@ class Arbiter:
             unique_opps.sort(
                 key=lambda o: self._score_coop_option(o, state.factions), reverse=True
             )
-            print(f"    Attempting {len(unique_opps)} unique category/level combinations (highest alignment first):")
+            self._vprint(f"    Attempting {len(unique_opps)} unique category/level combinations (highest alignment first):")
 
             bought_one = False
             for opp in unique_opps:
@@ -950,8 +956,8 @@ class Arbiter:
                 other_score = self._score_coop_option(
                     {"category": cat, "level": lvl, "option": other_option}, state.factions
                 )
-                print(f"\n    Evaluating: {cat} L{lvl} — {option} (costs {cost_str})")
-                print(f"      [Score: {option}={score}, {other_option}={other_score}]")
+                self._vprint(f"\n    Evaluating: {cat} L{lvl} — {option} (costs {cost_str})")
+                self._vprint(f"      [Score: {option}={score}, {other_option}={other_score}]")
 
                 # Show per-faction token state and willingness
                 willing_factions = []
@@ -959,12 +965,12 @@ class Arbiter:
                     tok_str = ", ".join(f"{c}:{n}" for c, n in f["tokens"].items() if n > 0) or "none"
                     benefits = self._faction_benefits_from(f, cat)
                     status = "willing" if benefits else "unwilling (not their goal)"
-                    print(f"      {f['name']}: [{tok_str}] — {status}")
+                    self._vprint(f"      {f['name']}: [{tok_str}] — {status}")
                     if benefits:
                         willing_factions.append(f)
 
                 if not willing_factions:
-                    print(f"    → SKIPPED — no faction has {cat} in their goals")
+                    self._vprint(f"    → SKIPPED — no faction has {cat} in their goals")
                     continue
 
                 # Try to pool: only from willing factions, richest first
@@ -987,7 +993,7 @@ class Arbiter:
                         short_colors.append(f"{remaining} {color}")
 
                 if short_colors:
-                    print(f"    → NOT PURCHASED — combined tokens still short: {', '.join(short_colors)}")
+                    self._vprint(f"    → NOT PURCHASED — combined tokens still short: {', '.join(short_colors)}")
                     continue
 
                 # Deduct pooled tokens
@@ -1008,8 +1014,8 @@ class Arbiter:
                     f"{fn}: " + ", ".join(f"{n} {c}" for c, n in cols.items())
                     for fn, cols in pool.items()
                 )
-                print(f"    → PURCHASED: {cat} L{lvl} — {option}")
-                print(f"      Contributors: {contribs}")
+                self._vprint(f"    → PURCHASED: {cat} L{lvl} — {option}")
+                self._vprint(f"      Contributors: {contribs}")
                 self._logger.log_event("culture_purchase", era=state.era,
                     category=cat, level=lvl, option=option, cost=cost,
                     cooperative=True, contributors=pool)
@@ -1151,7 +1157,7 @@ class Arbiter:
         challenge_event = random.choice(CHALLENGE_EVENTS)
         difficulty = state.challenge_difficulty
         print(f"    Challenge event: {challenge_event}")
-        print(f"    Difficulty: {difficulty}")
+        self._vprint(f"    Difficulty: {difficulty}")
 
         # GM narrates the challenge with regional specifics
         print(f"\n    → GM describing the challenge...", end="", flush=True)
@@ -1218,8 +1224,8 @@ class Arbiter:
             state.update_faction_tokens(leading_name, leader_tokens)
 
         token_pool = leader_donation
-        print(f"\n    [LEADER DONATION: {leading_name} donates {leader_donation} token(s)]")
-        print(f"    [can_solicit={can_solicit}, can_compel={can_compel}]")
+        self._vprint(f"\n    [LEADER DONATION: {leading_name} donates {leader_donation} token(s)]")
+        self._vprint(f"    [can_solicit={can_solicit}, can_compel={can_compel}]")
 
         donation_parts = [f"{leading_name} (leader): {leader_donation}"]
 
@@ -1231,7 +1237,7 @@ class Arbiter:
 
         # ── Step 2a: Compel ───────────────────────────────────────────────────
         if can_compel:
-            print(f"\n    [COMPEL]")
+            self._vprint(f"\n    [COMPEL]")
             targets_sorted = sorted(
                 non_leaders,
                 key=lambda a: sum(state.get_faction(a.faction_data["name"])["tokens"].values()),
@@ -1269,14 +1275,14 @@ class Arbiter:
                     result_str = "refused"
                     donation_parts.append(f"{tname}: 0 (compel refused)")
 
-                print(
+                self._vprint(
                     f"      [COMPEL: {tname} rolled {target_roll_raw}-{target_rank}={target_roll_adj},"
                     f" leader rolled {leader_roll} → {result_str}]"
                 )
 
         # ── Step 2b: Solicit ──────────────────────────────────────────────────
         elif can_solicit:
-            print(f"\n    [SOLICIT]")
+            self._vprint(f"\n    [SOLICIT]")
             leader_primary_option = leader_faction.get("goals", {}).get("primary", {}).get("option", "")
 
             for target_agent in non_leaders:
@@ -1306,10 +1312,10 @@ class Arbiter:
                     result_str = "refuses"
                     donation_parts.append(f"{tname}: 0 (solicited, refused)")
 
-                print(f"      [SOLICIT: {tname} → {result_str} (roll {solicit_roll})]")
+                self._vprint(f"      [SOLICIT: {tname} → {result_str} (roll {solicit_roll})]")
 
         else:
-            print(f"    [Leader cannot solicit or compel — proceeding to resolution]")
+            self._vprint(f"    [Leader cannot solicit or compel — proceeding to resolution]")
             for a in non_leaders:
                 donation_parts.append(f"{a.faction_data['name']}: 0 (no solicitation)")
 
@@ -1318,7 +1324,7 @@ class Arbiter:
         total = d20 + token_pool + leader_vp_bonus
         success = total >= difficulty
 
-        print(
+        self._vprint(
             f"\n    [Roll: {d20} + {token_pool} tokens + {leader_vp_bonus} VP bonus = {total}"
             f" vs difficulty {difficulty} → {'SUCCESS' if success else 'FAILURE'}]"
         )
@@ -1337,27 +1343,27 @@ class Arbiter:
             challenge_result = {"success": True, "roll": d20, "total": total, "boons": boons}
         else:
             # Re-roll initiative for all factions
-            print(f"\n    [INITIATIVE RE-ROLL]")
+            self._vprint(f"\n    [INITIATIVE RE-ROLL]")
             new_initiative: dict[str, int] = {}
             for agent in self._factions:
                 fname = agent.faction_data["name"]
                 r = roll(20)
                 new_initiative[fname] = r
-                print(f"      {fname}: rolled {r}")
+                self._vprint(f"      {fname}: rolled {r}")
             new_order = sorted(new_initiative, key=lambda n: new_initiative[n], reverse=True)
             state.set_initiative_order(new_order)
             # Re-sync faction_data references
             for agent in self._factions:
                 agent.faction_data = state.get_faction(agent.faction_data["name"])
             new_leader = new_order[0]
-            print(f"    [New leading faction: {new_leader}]")
-            print(f"    [New initiative order: {', '.join(new_order)}]")
+            self._vprint(f"    [New leading faction: {new_leader}]")
+            self._vprint(f"    [New initiative order: {', '.join(new_order)}]")
             self._logger.log_event("initiative_reroll", era=state.era,
                 rolls=new_initiative, order=new_order, new_leader=new_leader)
             challenge_result = {"success": False, "roll": d20, "total": total, "new_leader": new_leader}
 
         state.advance_difficulty(failed=not success)
-        print(f"    [Next difficulty: {state.challenge_difficulty}]")
+        self._vprint(f"    [Next difficulty: {state.challenge_difficulty}]")
 
         # ── Step 4: GM narrates the outcome ──────────────────────────────────
         donation_summary = "; ".join(donation_parts)
@@ -1399,7 +1405,7 @@ class Arbiter:
         non_double = [b for b in BOON_TABLE if b != "TWO boons! (reroll twice)"]
         result = random.choice(BOON_TABLE)
         if result == "TWO boons! (reroll twice)":
-            print(f"    [TWO BOONS!]")
+            self._vprint(f"    [TWO BOONS!]")
             return [random.choice(non_double), random.choice(non_double)]
         return [result]
 
@@ -1423,8 +1429,9 @@ class Arbiter:
         if leader_before is not None and leader_before != state.leading_faction:
             for f in state.factions:
                 f["needs_reconsideration"] = True
-            print("    [Reconsideration triggered: leading faction changed this era]")
+            self._vprint("    [Reconsideration triggered: leading faction changed this era]")
 
+        pause("  ── End of era. Press Space/Enter to continue or Esc to quit ──", era=state.era, end_of_era=True)
         return [gm_output.to_dict()]
 
     # ── Victory check ─────────────────────────────────────────────────────────
