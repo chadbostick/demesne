@@ -75,18 +75,18 @@ CULTURE_STRATEGY_COLOR: dict = {
 # ── Make exchange tables ───────────────────────────────────────────────────────
 
 BASE_MAKE_OPTIONS: dict = {
-    "holy_site":  {"exchange_color": "red",    "give": 2, "receive": 2},
-    "commons":    {"exchange_color": "blue",   "give": 2, "receive": 2},
-    "marker":     {"exchange_color": "green",  "give": 2, "receive": 2},
-    "storehouse": {"exchange_color": "orange", "give": 2, "receive": 2},
-    "workyard":   {"exchange_color": "pink",   "give": 2, "receive": 2},
+    "holy_site":  {"exchange_color": "red"},
+    "commons":    {"exchange_color": "blue"},
+    "marker":     {"exchange_color": "green"},
+    "storehouse": {"exchange_color": "orange"},
+    "workyard":   {"exchange_color": "pink"},
 }
 
-# Make exchange receive count scales with color level: give × (level + 1)
-# L0: give=2, receive=2  |  L1: give=2, receive=4  |  L2: give=2, receive=6  |  L3: give=2, receive=8
+# Make exchange: faction chooses N tokens to spend, receives N + color_level back.
+# L0: spend 2 → get 2  |  L1: spend 2 → get 3  |  L2: spend 2 → get 4  |  L3: spend 2 → get 5
 def make_receive_for_level(color_level: int, give: int) -> int:
-    """Return receive count for a make exchange at the given color culture level."""
-    return give * (color_level + 1)
+    """Return receive count for a make exchange. Formula: N + color_level."""
+    return give + color_level
 
 
 def apply_make_exchange(

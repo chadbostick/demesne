@@ -140,9 +140,9 @@ class Arbiter:
             if stance == "make":
                 make_opt = self._find_make_option_by_color(color)
                 if make_opt:
-                    give = make_opt["give"]
+                    give = tokens.get(color, 0)  # spend all available tokens of this color
                     receive = make_receive_for_level(color_level, give)
-                    if tokens.get(color, 0) >= give:
+                    if give >= 1:
                         # Pick one receive color — best for faction's primary goal
                         primary_cat = faction.get("goals", {}).get("primary", {}).get("category", "")
                         receive_color = CULTURE_STRATEGY_COLOR.get(primary_cat, random.choice(_all_colors))
@@ -433,16 +433,12 @@ class Arbiter:
         new_make_n = choice.get("make_name", "").strip() or old_make
 
         state.set_color_names(color, new_strat, new_make_n)
-        give = BASE_MAKE_OPTIONS.get(
-            next(k for k, v in BASE_MAKE_OPTIONS.items() if v["exchange_color"] == color), {}
-        ).get("give", 2)
-        receive = make_receive_for_level(new_level, give)
         print(
             f"      [{color.upper()} L{new_level}] Strategy renamed: {old_strategy!r} → {new_strat!r}"
         )
         print(
             f"      [{color.upper()} L{new_level}] Make renamed: {old_make!r} → {new_make_n!r}"
-            f"  (exchange: give {give} → receive {receive})"
+            f"  (exchange formula: spend N → receive N+{new_level})"
         )
         self._logger.log(rename_out)
         outputs.append(rename_out.to_dict())
