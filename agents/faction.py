@@ -344,11 +344,11 @@ currently leading the settlement through a crisis.
 
 {self._ideology_block()}
 {culture_section}
-THE CRISIS OF THIS GENERATION:
+THE CRISIS OF THIS AGE:
 {challenge_text}
 
 This is not a single battle or a brief storm — this is the defining crisis of an entire \
-generation. It will be remembered for centuries. Describe what {self.faction_data['name']} \
+age, unfolding over decades or centuries. Describe what {self.faction_data['name']} \
 will commit to face this. What will be sacrificed? What institutions mobilized? What will \
 the elders tell the children about this moment?
 
@@ -572,10 +572,11 @@ DURING THIS GENERATION:
 {activity_line}
 {result_line}
 
-Each era spans a generation — decades of life, not days. Write 2-3 sentences describing what \
-{self.faction_data['name']} accomplished across this period and how it shaped their people. \
-Describe the work of years: traditions taking root, children growing up within new practices, \
-elders passing down what was built. Write in THIRD PERSON — refer to the faction by name or \
+Each era spans decades or centuries — not days or years. Write 2-3 sentences describing what \
+{self.faction_data['name']} accomplished across this long age and how it shaped their people. \
+Describe the work of generations: dynasties rising and falling, traditions calcifying into \
+law, landscapes transformed by sustained effort, entire lifetimes lived within the structures \
+their ancestors built. Write in THIRD PERSON — refer to the faction by name or \
 as "they", never "we" or "our".
 
 VOICE CONSTRAINT: No token colors, no rolls, no victory points, no game mechanics. \

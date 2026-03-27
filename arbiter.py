@@ -101,7 +101,7 @@ class Arbiter:
         while not state.game_over and state.era < max_eras:
             state.increment_era()
             stage = state.settlement_stage()
-            print(f"\n{'='*60}\n  Generation {state.era} — {state._data['name']} ({stage})\n{'='*60}")
+            print(f"\n{'='*60}\n  Age {state.era} — {state._data['name']} ({stage})\n{'='*60}")
             era_outputs = self.run_era(state)
             self._write_era_files(output_dir, state, era_outputs)
             self.check_victory(state)

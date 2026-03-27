@@ -77,7 +77,7 @@ def _build_game_chronicle(state: SettlementState, all_events: list[dict], max_er
         if era_num == 0:
             era_entry["label"] = "Pre-Game Setup"
         else:
-            era_entry["label"] = f"Generation {era_num}"
+            era_entry["label"] = f"Age {era_num}"
 
         # Extract key data per era
         era_entry["challenges"] = [e for e in era_events if e["event_type"] == "challenge_drawn"]
@@ -158,7 +158,7 @@ def write_final_summary(output_dir: str, state: SettlementState, all_actions: li
             era = action.get("round", 0)
             if era != current_era:
                 current_era = era
-                f.write(f"\n{'='*60}\nGeneration {current_era}\n{'='*60}\n\n")
+                f.write(f"\n{'='*60}\nAge {current_era}\n{'='*60}\n\n")
             content = _clean_narrative(action["content"])
             if not content:
                 continue

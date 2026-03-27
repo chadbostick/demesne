@@ -49,7 +49,7 @@ You are the chronicler of a fantasy settlement. You record history as it unfolds
 SETTLEMENT STATE:
 {state_summary}
 {prev_block}{strat_block}{prev_challenges_block}
-THE CRISIS OF THIS GENERATION: "{challenge_text}"
+THE CRISIS OF THIS AGE: "{challenge_text}"
 
 Consider HOW this crisis connects to what came before. Is it:
 - A CONSEQUENCE of the settlement's choices? (They ignored warnings, overextended, \
@@ -66,8 +66,8 @@ that gave the people tools they didn't know they'd need.
 In 3-5 sentences, chronicle what befell the people. Name specific places and historical \
 figures. Set the stakes in generational terms. Do not resolve the crisis yet.
 
-VOICE CONSTRAINT: Write as a historian looking back across decades. No tokens, rolls, \
-victory points, or game mechanics.
+VOICE CONSTRAINT: Write as a historian looking back across decades or centuries. No tokens, \
+rolls, victory points, or game mechanics.
 """
         return self._call_llm(prompt, round_num, "challenge_narration")
 
@@ -95,7 +95,7 @@ You are the chronicler of a fantasy settlement. You record history as it unfolds
 SETTLEMENT STATE:
 {state_summary}
 
-THE CRISIS OF THIS GENERATION:
+THE CRISIS OF THIS AGE:
 {challenge_text}
 
 THE LEADER'S PLAN:
@@ -107,8 +107,8 @@ HOW THE SETTLEMENT RESPONDED:
 OUTCOME: The settlement {outcome_word}.
 {boon_line}
 
-This crisis defined a generation. Write 3-5 sentences describing what happened over the years \
-it took to resolve.
+This crisis defined an age. Write 3-5 sentences describing what happened over the decades \
+or centuries it took to resolve.
 
 Connect the outcome to the settlement's larger arc:
 - If they PREVAILED: What earlier choices, structures, or cultural values gave them the \
@@ -120,8 +120,8 @@ Connect the outcome to the settlement's larger arc:
 Reference specific named historical figures, structures, and places. Show how this crisis \
 transformed not just the settlement's condition, but its character.
 
-VOICE CONSTRAINT: Write as a historian looking back across decades. No tokens, rolls, \
-victory points, or game mechanics.
+VOICE CONSTRAINT: Write as a historian looking back across decades or centuries. No tokens, \
+rolls, victory points, or game mechanics.
 """
         return self._call_llm(prompt, round_num, "challenge_outcome", max_tokens=512)
 
@@ -262,7 +262,7 @@ WHAT THE FACTIONS SAID AND DID THIS GENERATION:
 CHALLENGE OUTCOME:
 {result_text}
 
-A generation has passed. Write TWO sections:
+Decades or centuries have passed. Write TWO sections:
 
 First, close this historical period in 4-6 sentences. Describe what changed permanently: which \
 communities rose, which declined, what the children of this generation will inherit. Name this \
@@ -296,7 +296,7 @@ A CULTURAL SHIFT HAS TAKEN ROOT:
 The people of {settlement_name} have embraced a new way: {option} — a shift in how the community \
 understands {category}. This was driven by {purchaser}.
 
-This shift took root over a generation — it was not a decree but a gradual transformation. \
+This shift took root over decades or centuries — it was not a decree but a gradual transformation. \
 In 3-4 sentences, chronicle how this changed the community permanently. How do the children \
 of this generation grow up differently than their parents? What old ways were abandoned? \
 What new assumptions do people carry without questioning?
@@ -339,8 +339,8 @@ SETTLEMENT STATE:
 
 {source_block}
 
-A generation has passed. Write 3-4 sentences summarizing what the settlement's people accomplished \
-across these decades. Describe the work of a lifetime: what was built, what traditions took root, \
+Decades or centuries have passed. Write 3-4 sentences summarizing what the settlement's people accomplished \
+across these decades or centuries. Describe the work of generations: what was built, what traditions took root, \
 how the landscape changed under sustained effort.
 
 End with a hint of what's unresolved or fragile — something the people haven't noticed, \
