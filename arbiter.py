@@ -14,7 +14,7 @@ from mechanics.strategies import (
     CULTURE_STRATEGY_COLOR,
     roll_strategy_dice, resolve_strategy_rolls, make_receive_for_level,
 )
-from mechanics.worldbuilding import CHALLENGE_EVENTS
+from mechanics.worldbuilding import CHALLENGE_EVENTS, BOON_TABLE
 from mechanics.cultures import CULTURE_TREE
 from mechanics.scoring import score_all_factions
 from mechanics.ideologies import IDEOLOGIES
@@ -27,14 +27,6 @@ if TYPE_CHECKING:
     from phases.engine import PhaseEngine
     from logger import ActionLogger
 
-
-PLACEHOLDER_BOONS = [
-    "A hidden spring is discovered, securing the settlement's water for a generation.",
-    "A skilled artisan joins the settlement, bringing new techniques that boost production.",
-    "A diplomatic agreement opens a lucrative trade route to the east.",
-    "Ancient ruins are unearthed nearby, revealing both treasure and historical knowledge.",
-    "A successful harvest festival strengthens community bonds and restores morale.",
-]
 
 
 class Arbiter:
@@ -1218,10 +1210,12 @@ class Arbiter:
             donations=donation_parts)
 
         if success:
-            boon = random.choice(PLACEHOLDER_BOONS)
-            state.add_boon(boon)
-            print(f"    [Boon: {boon}]")
-            challenge_result = {"success": True, "roll": d20, "total": total, "boon": boon}
+            boons = self._roll_boons()
+            for boon in boons:
+                state.add_boon(boon)
+            boon_str = " + ".join(boons)
+            print(f"    [Boon: {boon_str}]")
+            challenge_result = {"success": True, "roll": d20, "total": total, "boons": boons}
         else:
             # Re-roll initiative for all factions
             print(f"\n    [INITIATIVE RE-ROLL]")
@@ -1262,9 +1256,33 @@ class Arbiter:
         self._logger.log(outcome_output)
         outputs.append(outcome_output.to_dict())
 
+        # ── Step 5: GM narrates the boon(s) if success ─────────────────────────
+        if success and boons:
+            print(f"\n    → GM chronicling the boon...", end="", flush=True)
+            boon_output = self._gm.narrate_boon(
+                round_num=state.era,
+                boons=boons,
+                challenge_text=challenge_text,
+                state_summary=state.summary(),
+            )
+            print(" done.\n")
+            print(boon_output.content)
+            self._logger.log(boon_output)
+            outputs.append(boon_output.to_dict())
+            self._logger.log_event("boon_awarded", era=state.era, boons=boons)
+
         pause("  ── Challenge resolved. Press Space/Enter to continue or Esc to quit ──", era=state.era)
         self._last_challenge_result = challenge_result
         return outputs
+
+    def _roll_boons(self) -> list[str]:
+        """Roll on the boon table. Handle 'TWO boons!' by re-rolling twice."""
+        non_double = [b for b in BOON_TABLE if b != "TWO boons! (reroll twice)"]
+        result = random.choice(BOON_TABLE)
+        if result == "TWO boons! (reroll twice)":
+            print(f"    [TWO BOONS!]")
+            return [random.choice(non_double), random.choice(non_double)]
+        return [result]
 
     # ── End of Era Phase ──────────────────────────────────────────────────────
 

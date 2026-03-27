@@ -55,7 +55,8 @@ game mechanics, or faction names as organizational labels. No metagaming languag
         success = result.get("success", False)
         outcome_word = "prevailed" if success else "failed"
         if success:
-            boon_line = f"A boon was earned: {result.get('boon', '')}"
+            boons = result.get("boons", [result.get("boon", "")])
+            boon_line = f"Boons earned: {', '.join(boons)}"
         else:
             new_leader = result.get("new_leader", "another group")
             boon_line = f"The settlement suffered setback. Leadership has passed to {new_leader}."
@@ -86,6 +87,40 @@ victory points, difficulty, or any game mechanics. No metagaming language. Groun
 observation in the lived reality of the settlers.
 """
         return self._call_llm(prompt, round_num, "challenge_outcome", max_tokens=256)
+
+    def narrate_boon(
+        self,
+        round_num: int,
+        boons: list[str],
+        challenge_text: str,
+        state_summary: str,
+    ) -> AgentOutput:
+        boon_list = "\n".join(f"  - {b}" for b in boons)
+        prompt = f"""\
+You are the chronicler of a fantasy settlement. You record history as it unfolds.
+
+SETTLEMENT STATE:
+{state_summary}
+
+THE SETTLEMENT OVERCAME A CHALLENGE:
+{challenge_text}
+
+AS A RESULT, THE SETTLEMENT RECEIVES:
+{boon_list}
+
+Narrate what the settlement gains. Be specific and flavorful — give things proper names, describe \
+what they look like, where they are, how they change daily life. These are lasting additions to \
+the settlement that will be remembered for generations.
+
+Do NOT just restate the boon name. Transform it into a vivid, grounded description of what \
+actually appeared, was discovered, or changed. Consider the settlement's geography, cultures, \
+and the people who live here.
+
+Write 2-4 sentences per boon. Past tense, third-person omniscient.
+
+VOICE CONSTRAINT: Write as a historian. No tokens, rolls, victory points, or game mechanics.
+"""
+        return self._call_llm(prompt, round_num, "boon_narration", max_tokens=512)
 
     def narrate_end_of_era(
         self,
