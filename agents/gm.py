@@ -121,6 +121,48 @@ No faction labels. No metagaming language. Describe the lived reality of this ch
 """
         return self._call_llm(prompt, round_num, "culture_purchase", max_tokens=256)
 
+    def narrate_strategy_phase(
+        self,
+        round_num: int,
+        state_summary: str,
+        faction_summaries: list[dict],
+        faction_narratives: list[str] | None = None,
+        mode: str = "summary",
+    ) -> AgentOutput:
+        if mode == "narrative" and faction_narratives:
+            source_block = "WHAT THE PEOPLE DID THIS ERA:\n" + "\n\n".join(faction_narratives)
+        else:
+            lines = []
+            for fs in faction_summaries:
+                if fs["tokens_earned"] == 0:
+                    outcome = "their efforts yielded nothing"
+                elif fs["tokens_earned"] <= 2:
+                    outcome = "modest gains"
+                elif fs["tokens_earned"] <= 5:
+                    outcome = "strong results"
+                else:
+                    outcome = "an exceptional bounty"
+                lines.append(f"- {fs['name']}: focused on {fs['activity']} — {outcome}")
+            source_block = "WHAT HAPPENED:\n" + "\n".join(lines)
+
+        prompt = f"""\
+You are the chronicler of a fantasy settlement. You record history as it unfolds.
+
+SETTLEMENT STATE:
+{state_summary}
+
+{source_block}
+
+Write 2-3 sentences summarizing what the settlement's people accomplished this era. Write in past \
+tense, third-person omniscient — you are a historian looking back on events. Describe the collective \
+efforts: what was attempted, what bore fruit, and what fell short.
+
+VOICE CONSTRAINT: Write as a historian recording real events. Do NOT mention tokens, rolls, victory \
+points, strategies, factions, phases, eras, or any game mechanics. No metagaming language. Ground \
+every observation in the lived reality of the settlers.
+"""
+        return self._call_llm(prompt, round_num, "strategy_summary", max_tokens=256)
+
     def _call_llm(self, prompt: str, round_num: int, phase: str, max_tokens: int = 1024) -> AgentOutput:
         import anthropic
         import config

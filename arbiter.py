@@ -9,11 +9,11 @@ from utils import pause
 from mechanics.dice import roll
 from mechanics.cultures import CULTURE_TREE, can_purchase, get_cost
 from mechanics.strategies import (
-    BASE_STRATEGIES, lookup_payout, award_tokens,
+    BASE_STRATEGIES, award_tokens,
     apply_make_exchange, BASE_MAKE_OPTIONS,
-    CULTURE_STRATEGY_COLOR, CULTURE_LEVEL_TO_TABLE,
+    CULTURE_STRATEGY_COLOR,
     CHALLENGE_CATEGORIES,
-    roll_strategy_dice, make_receive_for_level,
+    roll_strategy_dice, resolve_strategy_rolls, make_receive_for_level,
 )
 from mechanics.cultures import CULTURE_TREE
 from mechanics.scoring import score_all_factions
@@ -103,6 +103,8 @@ class Arbiter:
         print(f"\n  [STRATEGY PHASE]")
         outputs = []
         _all_colors = ["red", "blue", "green", "orange", "pink"]
+        _faction_summaries: list[dict] = []
+        _faction_narratives: list[str] = []
 
         for agent in self._factions_in_initiative_order(state):
             fname = agent.faction_data["name"]
@@ -161,26 +163,22 @@ class Arbiter:
                         print(f"\n{narrative_out.content}\n")
                         self._logger.log(narrative_out)
                         outputs.append(narrative_out.to_dict())
+                        _faction_summaries.append({"name": fname, "activity": f"building ({custom_make_name})", "tokens_earned": 0})
+                        _faction_narratives.append(narrative_out.content)
                         pause(f"  ── {fname} done. Press Space/Enter to continue or Esc to quit ──")
                         continue
                 # Fall through to normal execution if make not possible
 
-            table = self._get_strategy_table(state, strategy, color)
-            best_roll, all_rolls = roll_strategy_dice(color_level)
-            base_count, bonus_count = lookup_payout(table, best_roll)
+            all_rolls = roll_strategy_dice(color_level)
+            base_count, bonus_count = resolve_strategy_rolls(all_rolls)
             dice_display = (
                 str(all_rolls[0]) if len(all_rolls) == 1
-                else f"{len(all_rolls)}d20 {all_rolls} → best {best_roll}"
+                else f"{len(all_rolls)}d20 {all_rolls}"
             )
-            if base_count == 0 and bonus_count == 12:
-                bonus_colors = [random.choice(_all_colors) for _ in range(12)]
-                tokens = award_tokens(tokens, color, 0, 12, bonus_colors)
-                tokens_earned = 12
-                print(f"    {fname} [{stance}→{custom_strategy_name}] rolled {dice_display} → 12 free-choice: {bonus_colors}")
-            else:
-                tokens = award_tokens(tokens, color, base_count, bonus_count)
-                tokens_earned = base_count + bonus_count
-                print(f"    {fname} [{stance}→{custom_strategy_name}] rolled {dice_display} → +{tokens_earned} {color}")
+            tokens = award_tokens(tokens, color, base_count, bonus_count)
+            tokens_earned = base_count + bonus_count
+            bonus_note = f" + {bonus_count} any" if bonus_count > 0 else ""
+            print(f"    {fname} [{stance}→{custom_strategy_name}] rolled {dice_display} → +{base_count} {color}{bonus_note}")
 
             tok_str = ", ".join(f"{c}:{n}" for c, n in tokens.items())
             print(f"      [Tokens now: {tok_str}]")
@@ -191,8 +189,33 @@ class Arbiter:
             print(f"\n{narrative_out.content}\n")
             self._logger.log(narrative_out)
             outputs.append(narrative_out.to_dict())
+            _STRATEGY_ACTIVITY = {
+                "pray": "prayer and devotion", "discuss": "discourse and debate",
+                "lead": "leadership and rallying", "organize": "planning and coordination",
+                "forage": "scouting and gathering",
+            }
+            _faction_summaries.append({"name": fname, "activity": _STRATEGY_ACTIVITY.get(strategy, strategy), "tokens_earned": tokens_earned})
+            _faction_narratives.append(narrative_out.content)
 
             pause(f"  ── {fname} done. Press Space/Enter to continue or Esc to quit ──")
+
+        # ── GM strategy summary narration ─────────────────────────────────────
+        narration_mode = config.STRATEGY_NARRATION_MODE
+        if narration_mode != "off" and _faction_summaries:
+            print(f"\n    → GM summarizing the era's efforts...", end="", flush=True)
+            gm_output = self._gm.narrate_strategy_phase(
+                round_num=state.era,
+                state_summary=state.summary(),
+                faction_summaries=_faction_summaries,
+                faction_narratives=_faction_narratives if narration_mode == "narrative" else None,
+                mode=narration_mode,
+            )
+            print(" done.\n")
+            print(gm_output.content)
+            self._logger.log(gm_output)
+            outputs.append(gm_output.to_dict())
+            pause("  ── Strategy phase complete. Press Space/Enter to continue or Esc to quit ──")
+
         return outputs
 
     def _stance_to_strategy(
@@ -242,13 +265,6 @@ class Arbiter:
             if opt["exchange_color"] == color:
                 return opt
         return None
-
-    def _get_strategy_table(self, state: "SettlementState", strategy: str, color: str) -> str:
-        """Return the payout table name based on the color's current level."""
-        level = state.get_color_level(color)
-        if level == 0:
-            return "base"
-        return CULTURE_LEVEL_TO_TABLE.get(level, "base")
 
     # ── Investment Phase ──────────────────────────────────────────────────────
 

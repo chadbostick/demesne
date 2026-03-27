@@ -4,64 +4,50 @@ Strategy definitions, payout tables, and Make exchange logic.
 import random
 
 
-# ── Payout tables ──────────────────────────────────────────────────────────────
-# Format: list of (min_roll, max_roll, base_tokens, bonus_choice_tokens)
-# bonus_choice_tokens > 0 means that many additional tokens of the faction's choice
+# ── Payout table ──────────────────────────────────────────────────────────────
+# Single table used for all levels. Higher culture levels roll more dice;
+# each die is checked independently and all results are summed.
+# Format: (min_roll, max_roll, base_tokens, bonus_choice_tokens)
 
-PAYOUT_TABLES: dict = {
-    "base": [
-        (1,  4,  0, 0),
-        (5,  15, 1, 0),
-        (16, 19, 2, 0),
-        (20, 20, 2, 1),  # 2 of color + 1 of choice
-    ],
-    "level1": [
-        (1,  1,  0, 0),
-        (2,  4,  1, 0),
-        (5,  16, 2, 0),
-        (17, 19, 3, 0),
-        (20, 20, 3, 1),  # 3 of color + 1 of choice
-    ],
-    "level2": [
-        (1,  1,  1, 0),
-        (2,  3,  2, 0),
-        (4,  9,  3, 0),
-        (10, 15, 4, 0),
-        (16, 19, 5, 2),  # 5 of color + 2 of choice
-        (20, 20, 6, 3),  # 6 of color + 3 of choice
-    ],
-    "level3": [
-        (1,  4,  2,  0),
-        (5,  10, 4,  0),
-        (11, 15, 6,  0),
-        (16, 19, 6,  4),   # 6 of color + 4 of any
-        (20, 20, 12, 0),   # 12 of any combination (handled specially)
-    ],
-}
+PAYOUT_TABLE: list = [
+    (1,  1,  0, 0),
+    (2,  12, 1, 0),
+    (13, 19, 2, 0),
+    (20, 20, 3, 1),  # 3 of color + 1 of any color
+]
 
 
-def roll_strategy_dice(color_level: int) -> tuple[int, list[int]]:
+def roll_strategy_dice(color_level: int) -> list[int]:
     """
-    Roll (color_level + 1) d20s.  Returns (best_roll, all_rolls).
-    L0 = 1d20, L1 = 2d20 take best, L2 = 3d20 take best, L3 = 4d20 take best.
+    Roll (color_level + 1) d20s.  Returns list of all rolls.
+    L0 = 1d20, L1 = 2d20, L2 = 3d20, L3 = 4d20.
+    Each die is evaluated independently against the payout table.
     """
     from mechanics.dice import roll as _roll
     n = max(1, color_level + 1)
-    rolls = [_roll(20) for _ in range(n)]
-    return max(rolls), rolls
+    return [_roll(20) for _ in range(n)]
 
 
-def lookup_payout(table_name: str, roll: int) -> tuple[int, int]:
-    """
-    Returns (base_tokens, bonus_choice_tokens) for a given roll.
-    For level3 roll=20, returns (0, 12) to signal 12 free-choice tokens.
-    """
-    if table_name == "level3" and roll == 20:
-        return (0, 12)
-    for (lo, hi, base, bonus) in PAYOUT_TABLES[table_name]:
+def lookup_payout(roll: int) -> tuple[int, int]:
+    """Returns (base_tokens, bonus_choice_tokens) for a single die roll."""
+    for (lo, hi, base, bonus) in PAYOUT_TABLE:
         if lo <= roll <= hi:
             return (base, bonus)
     return (0, 0)
+
+
+def resolve_strategy_rolls(rolls: list[int]) -> tuple[int, int]:
+    """
+    Evaluate each die independently against the payout table and sum results.
+    Returns (total_base, total_bonus).
+    """
+    total_base = 0
+    total_bonus = 0
+    for r in rolls:
+        base, bonus = lookup_payout(r)
+        total_base += base
+        total_bonus += bonus
+    return total_base, total_bonus
 
 
 # ── Strategy color mappings ────────────────────────────────────────────────────
@@ -85,14 +71,6 @@ CULTURE_STRATEGY_COLOR: dict = {
     "production":      "pink",
     "natural_affinity": "pink",
 }
-
-# Strategy payout table based on the level of the culture that unlocked it
-CULTURE_LEVEL_TO_TABLE: dict = {
-    1: "level1",
-    2: "level2",
-    3: "level3",
-}
-
 
 # ── Make exchange tables ───────────────────────────────────────────────────────
 
