@@ -89,7 +89,19 @@ def main() -> None:
         "--factions", type=int, default=0,
         help=f"Number of factions ({config.MIN_FACTIONS}-{config.MAX_FACTIONS}, random if not set)"
     )
+    parser.add_argument(
+        "--verbose", action="store_true", default=config.VERBOSE,
+        help="Show metagame info (tokens, dice rolls, decision trees)"
+    )
+    parser.add_argument(
+        "--pauses", action="store_true", default=config.ALL_PAUSES,
+        help="Pause at every phase (default: only end of era)"
+    )
     args = parser.parse_args()
+
+    # Set global display modes
+    config.VERBOSE = args.verbose
+    config.ALL_PAUSES = args.pauses
 
     if not config.ANTHROPIC_API_KEY:
         print("ERROR: ANTHROPIC_API_KEY is not set. Create a .env file or export the variable.")

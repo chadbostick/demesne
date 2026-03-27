@@ -519,16 +519,17 @@ Nothing else.
         culture_section = f"\n{culture_block}\n" if culture_block else ""
 
         prompt = f"""\
-You are {self.faction_data['name']}.
+You are the chronicler for {self.faction_data['name']}, a {self.faction_data['organization_type']} of {self.faction_data['species']}.
 
 {self._ideology_block()}
 {culture_section}
-THIS ERA YOUR PEOPLE FOCUSED ON:
+THIS ERA THEY FOCUSED ON:
 {activity_line}
 {result_line}
 
-Write 1-2 sentences in your faction's voice describing what your people did and why it matters to \
-them. Speak as a settler, not a player. Make it vivid and grounded in your worldview.
+Write 2-3 sentences describing what {self.faction_data['name']} did and why it matters to \
+them. Write in THIRD PERSON — refer to the faction by name or as "they", never "we" or "our". \
+Make it vivid and grounded in their worldview.
 
 VOICE CONSTRAINT: No token colors, no rolls, no victory points, no game mechanics, no faction \
 labels, no fantasy clichés. Pure in-character settler voice.

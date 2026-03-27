@@ -1,12 +1,21 @@
 import sys
 import tty
 import termios
+import config
 
 
-def pause(message: str = "  ── Press Space/Enter to continue or Esc to quit ──", era: int = 0) -> None:
-    """Block until the user presses Space, Enter, or Esc. Esc exits the process. Skips during era 1."""
-    if era <= 1:
-        return
+def pause(message: str = "  ── Press Space/Enter to continue or Esc to quit ──", era: int = 0, end_of_era: bool = False) -> None:
+    """Block until the user presses Space, Enter, or Esc.
+
+    Pauses are shown:
+    - Always at end of era (end_of_era=True)
+    - At all other points only if config.ALL_PAUSES is True and era > 1
+    """
+    if not end_of_era:
+        if not config.ALL_PAUSES:
+            return
+        if era <= 1:
+            return
     print(f"\n{message} ", end="", flush=True)
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)

@@ -24,3 +24,7 @@ CULTURE_PREFERENCE_MODE = "deterministic"
 # Faction count range (random between min/max if --factions not specified)
 MIN_FACTIONS = 2
 MAX_FACTIONS = 5
+
+# Display modes (overridden by CLI flags)
+VERBOSE = False       # show metagame info (tokens, dice, decision trees)
+ALL_PAUSES = False    # pause at every phase, not just end of era

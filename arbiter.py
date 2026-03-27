@@ -55,6 +55,15 @@ class Arbiter:
         if self._verbose:
             print(*args, **kwargs)
 
+    def _faction_label(self, faction: dict) -> str:
+        """Format faction name with ideology and species for display."""
+        ideology = faction.get("ideology", "")
+        species = faction.get("species", "")
+        name = faction.get("name", "")
+        if ideology and species:
+            return f"{name} ({ideology} {species})"
+        return name
+
     # ── Public API ────────────────────────────────────────────────────────────
 
     def run(
@@ -97,7 +106,7 @@ class Arbiter:
     # ── Strategy Phase ────────────────────────────────────────────────────────
 
     def _run_strategy_phase(self, state: "SettlementState") -> list[dict]:
-        print(f"\n  [STRATEGY PHASE]")
+        print(f"\n  ── The People Take Action ──")
         outputs = []
         _all_colors = ["red", "blue", "green", "orange", "pink"]
         _faction_summaries: list[dict] = []
@@ -237,7 +246,8 @@ class Arbiter:
 
             # Brief in-character narrative (LLM, post-hoc flavor only)
             narrative_out = agent.run_strategy_narrative(state.era, strategy, tokens_earned, cultures=state.cultures)
-            print(f"\n{narrative_out.content}\n")
+            print(f"\n  **{self._faction_label(faction)}**\n")
+            print(f"{narrative_out.content}\n")
             self._logger.log(narrative_out)
             outputs.append(narrative_out.to_dict())
             _STRATEGY_ACTIVITY = {
@@ -549,7 +559,7 @@ class Arbiter:
     # ── Investment Phase ──────────────────────────────────────────────────────
 
     def _run_investment_phase(self, state: "SettlementState") -> list[dict]:
-        print(f"\n  [INVESTMENT PHASE]")
+        print(f"\n  ── Growth and Development ──")
         outputs = []
         any_purchase_made = False
         for agent in self._factions_in_initiative_order(state):
@@ -1147,7 +1157,7 @@ class Arbiter:
     # ── Challenge Phase ───────────────────────────────────────────────────────
 
     def _run_challenge_phase(self, state: "SettlementState") -> list[dict]:
-        print(f"\n  [CHALLENGE PHASE]")
+        print(f"\n  ── A Challenge Arises ──")
         outputs = []
 
         # Track leader before challenge for reconsideration trigger in end-of-era
@@ -1412,7 +1422,7 @@ class Arbiter:
     # ── End of Era Phase ──────────────────────────────────────────────────────
 
     def _run_end_of_era_phase(self, state: "SettlementState") -> list[dict]:
-        print(f"\n  [END OF ERA]")
+        print(f"\n  ── The Chronicle Closes ──")
         era_outputs_so_far = self._logger.get_recent(self._memory_window * 4)
         print(f"    → GM writing era summary...", end="", flush=True)
         gm_output = self._gm.narrate_end_of_era(
