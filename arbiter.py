@@ -119,6 +119,7 @@ class Arbiter:
                 color = make_override["exchange_color"]
                 strategy = "make"
                 _make_receive_color = make_override["receive_color"]
+                _make_give = make_override["give"]
                 faction["needs_reconsideration"] = False
                 print(f"    [{fname} → MAKE: {make_override['reason']}]")
             else:
@@ -142,6 +143,7 @@ class Arbiter:
                 stance = faction.get("current_stance", "pursue_primary")
                 strategy, color = self._stance_to_strategy(stance, faction, state)
                 _make_receive_color = None
+                _make_give = None
 
             color_level = state.get_color_level(color)
             cu = state.color_upgrades[color]
@@ -152,7 +154,7 @@ class Arbiter:
             if stance == "make":
                 make_opt = self._find_make_option_by_color(color)
                 if make_opt:
-                    give = tokens.get(color, 0)  # spend all available tokens of this color
+                    give = _make_give or tokens.get(color, 0)  # use calculated amount, or all if no override
                     receive = make_receive_for_level(color_level, give)
                     if give >= 1:
                         receive_color = _make_receive_color or self._pick_make_receive_color(faction, tokens, color, state)
@@ -338,15 +340,31 @@ class Arbiter:
 
         return result
 
+    def _future_path_cost(self, category: str, cultures: dict) -> dict[str, int]:
+        """
+        Total token cost for all remaining levels in a category.
+        E.g. if category is at L0, sums costs for L1 + L2 + L3.
+        """
+        current_level = cultures.get(category, {}).get("level", 0)
+        total: dict[str, int] = {}
+        for lvl in range(current_level + 1, 4):
+            cost = get_cost(category, lvl)
+            for c, n in cost.items():
+                total[c] = total.get(c, 0) + n
+        return total
+
     def _should_make_instead(self, faction: dict, state: "SettlementState") -> dict | None:
         """
         Check if the faction should override to a make exchange.
-        Returns {"reason": "...", "exchange_color": "..."} if make is better, None otherwise.
+        Returns {"reason", "exchange_color", "receive_color", "give"} or None.
 
-        Logic: for each goal-relevant culture the faction could buy next,
-        check if they're short on exactly one color and have surplus of another
-        that could be exchanged to cover it. Make gives N tokens of one color
-        for N+level of another single color.
+        Logic:
+        1. For each goal category, compute the NEXT level's shortfall.
+        2. Compute the FULL remaining path cost across all goal categories
+           to know which colors are reserved for future buys.
+        3. Only exchange tokens that are genuinely surplus (not needed for
+           any future goal purchase), and only exchange enough to cover
+           the immediate shortfall.
         """
         tokens = dict(faction["tokens"])
         goals = faction.get("goals", {})
@@ -364,6 +382,13 @@ class Arbiter:
         if t.get("category"):
             target_cats.append((t["category"], f"tertiary goal ({t['category']})"))
 
+        # Compute total future needs across ALL goal categories
+        future_needs: dict[str, int] = {}
+        for cat, _ in target_cats:
+            path_cost = self._future_path_cost(cat, cultures)
+            for c, n in path_cost.items():
+                future_needs[c] = future_needs.get(c, 0) + n
+
         for cat, reason in target_cats:
             cat_data = cultures.get(cat, {})
             next_lvl = cat_data.get("level", 0) + 1
@@ -372,7 +397,7 @@ class Arbiter:
 
             cost = get_cost(cat, next_lvl)
 
-            # Find colors we're short on
+            # Find colors we're short on for the NEXT level
             shortfall: dict[str, int] = {}
             for c, needed in cost.items():
                 have = tokens.get(c, 0)
@@ -387,23 +412,44 @@ class Arbiter:
                 for surplus_color in ["red", "blue", "green", "orange", "pink"]:
                     if surplus_color == short_color:
                         continue
-                    # Surplus = tokens we have minus what this purchase needs of that color
-                    surplus_available = tokens.get(surplus_color, 0) - cost.get(surplus_color, 0)
-                    if surplus_available < 1:
+
+                    have = tokens.get(surplus_color, 0)
+                    # Reserve tokens needed for this purchase's cost
+                    reserved_for_purchase = cost.get(surplus_color, 0)
+                    # Reserve tokens needed for future goal purchases
+                    reserved_for_future = max(0, future_needs.get(surplus_color, 0) - have)
+                    # True surplus: what we have minus all reservations
+                    # (future_needs already includes this level's cost)
+                    surplus_available = have - reserved_for_purchase
+                    # Don't sacrifice more than we can afford to lose for future needs
+                    # But allow exchanging if we have more than the full future path needs
+                    future_remaining = future_needs.get(surplus_color, 0)
+                    safe_to_exchange = max(0, have - future_remaining)
+                    # Use the lesser of: surplus after this purchase, or safe-to-exchange
+                    exchangeable = min(surplus_available, safe_to_exchange) if safe_to_exchange > 0 else surplus_available
+
+                    if exchangeable < 1:
                         continue
 
                     color_level = state.get_color_level(surplus_color)
-                    receive = make_receive_for_level(color_level, surplus_available)
+
+                    # Calculate minimum give to cover the shortfall
+                    # Formula: receive = give * (level + 1), so give = ceil(short / (level + 1))
+                    multiplier = color_level + 1
+                    min_give = (short_amount + multiplier - 1) // multiplier  # ceiling division
+                    give = min(min_give, exchangeable)
+                    receive = make_receive_for_level(color_level, give)
 
                     if receive >= short_amount:
                         return {
                             "reason": (
-                                f"exchange {surplus_available} {surplus_color} → "
+                                f"exchange {give} {surplus_color} → "
                                 f"{receive} {short_color} to cover {cat} L{next_lvl} "
                                 f"shortfall ({reason})"
                             ),
                             "exchange_color": surplus_color,
                             "receive_color": short_color,
+                            "give": give,
                         }
 
         return None
