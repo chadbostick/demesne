@@ -9,7 +9,7 @@ from utils import pause
 from mechanics.dice import roll
 from mechanics.cultures import CULTURE_TREE, can_purchase, get_cost
 from mechanics.strategies import (
-    BASE_STRATEGIES, award_tokens,
+    BASE_STRATEGIES, award_tokens, lookup_payout,
     apply_make_exchange, BASE_MAKE_OPTIONS,
     CULTURE_STRATEGY_COLOR,
     roll_strategy_dice, resolve_strategy_rolls, make_receive_for_level,
@@ -1404,6 +1404,41 @@ class Arbiter:
                 f = state.get_faction(fname)
                 f["influence"] = f.get("influence", 0) + contrib_roll
                 self._vprint(f"    [Influence: {fname} +{contrib_roll} (d6) → {f['influence']}]")
+
+            # Token rewards on success: leader rolls 2d20, contributors roll 1d20
+            _all_colors = ["red", "blue", "green", "orange", "pink"]
+            self._vprint(f"\n    [VICTORY SPOILS]")
+
+            # Leader: 2d20 → 1-2 tokens of any combination
+            leader_tokens_dict = dict(leader_faction["tokens"])
+            for i in range(2):
+                r = roll(20)
+                base, bonus = lookup_payout(r)
+                earned = base + bonus
+                if earned > 0:
+                    reward_color = self._pick_bonus_colors(leader_faction, leader_tokens_dict, "", 1, state)[0]
+                    leader_tokens_dict[reward_color] = leader_tokens_dict.get(reward_color, 0) + earned
+                    self._vprint(f"    [{leading_name} rolled {r} → +{earned} {reward_color}]")
+            state.update_faction_tokens(leading_name, leader_tokens_dict)
+            leader_faction["influence"] = leader_faction.get("influence", 0) + sum(
+                leader_tokens_dict[c] - leader_faction["tokens"].get(c, 0) for c in _all_colors
+            )
+
+            # Contributing factions: 1d20 → tokens of any color
+            for fname in contributing_factions:
+                if fname == leading_name:
+                    continue
+                f = state.get_faction(fname)
+                f_tokens = dict(f["tokens"])
+                r = roll(20)
+                base, bonus = lookup_payout(r)
+                earned = base + bonus
+                if earned > 0:
+                    reward_color = self._pick_bonus_colors(f, f_tokens, "", 1, state)[0]
+                    f_tokens[reward_color] = f_tokens.get(reward_color, 0) + earned
+                    self._vprint(f"    [{fname} rolled {r} → +{earned} {reward_color}]")
+                    state.update_faction_tokens(fname, f_tokens)
+                    f["influence"] = f.get("influence", 0) + earned
 
             challenge_result = {"success": True, "roll": d20, "total": total, "boons": boons}
         else:

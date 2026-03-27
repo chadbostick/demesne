@@ -183,6 +183,10 @@ def main() -> None:
         help=f"Number of factions ({config.MIN_FACTIONS}-{config.MAX_FACTIONS}, random if not set)"
     )
     parser.add_argument(
+        "--difficulty", type=int, default=10,
+        help="Starting challenge difficulty (default: 10)"
+    )
+    parser.add_argument(
         "--verbose", action="store_true", default=config.VERBOSE,
         help="Show metagame info (tokens, dice rolls, decision trees)"
     )
@@ -222,6 +226,7 @@ def main() -> None:
 
     # Build state and factions
     state = SettlementState(name=args.settlement_name)
+    state._data["challenge_difficulty"] = args.difficulty
     faction_agents = []
     for i, ideology_name in enumerate(chosen_ideologies):
         faction_data = build_faction_data(ideology_name, i)
