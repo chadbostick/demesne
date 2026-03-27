@@ -111,34 +111,35 @@ class Arbiter:
             faction = state.get_faction(fname)
             tokens = dict(faction["tokens"])
 
-            # ── Reconsideration (LLM) ────────────────────────────────────────
-            if faction.get("needs_reconsideration", False):
-                context = MemoryContext.build(state, self._logger, self._memory_window, fname)
-                print(f"\n    → {fname} reconsidering stance (LLM)...", end="", flush=True)
-                output = agent.run_strategy(context, state.era, state._data["available_strategies"])
-                print(" done.\n")
-                print(output.content)
-                self._logger.log(output)
-                outputs.append(output.to_dict())
-                choice = agent.parse_strategy_choice(output)
-                new_stance = choice.get("stance", "").lower()
-                if new_stance:
-                    faction["current_stance"] = new_stance
-                faction["needs_reconsideration"] = False
-                pause(f"  ── {fname} reconsideration done. Press Space/Enter to continue or Esc to quit ──", era=state.era)
-
-            # ── Mechanical execution ─────────────────────────────────────────
-            stance = faction.get("current_stance", "pursue_primary")
-
-            # Check if make exchange would let the faction afford a goal-relevant purchase
+            # ── Decide strategy ────────────────────────────────────────────
+            # 1. Check if make exchange enables a goal purchase (skip LLM if so)
             make_override = self._should_make_instead(faction, state)
             if make_override:
                 stance = "make"
                 color = make_override["exchange_color"]
                 strategy = "make"
                 _make_receive_color = make_override["receive_color"]
-                print(f"    [{fname} overriding to MAKE: {make_override['reason']}]")
+                faction["needs_reconsideration"] = False
+                print(f"    [{fname} → MAKE: {make_override['reason']}]")
             else:
+                # 2. Reconsider stance via LLM if triggered
+                if faction.get("needs_reconsideration", False):
+                    context = MemoryContext.build(state, self._logger, self._memory_window, fname)
+                    print(f"\n    → {fname} reconsidering stance (LLM)...", end="", flush=True)
+                    output = agent.run_strategy(context, state.era, state._data["available_strategies"])
+                    print(" done.\n")
+                    print(output.content)
+                    self._logger.log(output)
+                    outputs.append(output.to_dict())
+                    choice = agent.parse_strategy_choice(output)
+                    new_stance = choice.get("stance", "").lower()
+                    if new_stance:
+                        faction["current_stance"] = new_stance
+                    faction["needs_reconsideration"] = False
+                    pause(f"  ── {fname} reconsideration done. Press Space/Enter to continue or Esc to quit ──", era=state.era)
+
+                # 3. Resolve stance to strategy + color
+                stance = faction.get("current_stance", "pursue_primary")
                 strategy, color = self._stance_to_strategy(stance, faction, state)
                 _make_receive_color = None
 
