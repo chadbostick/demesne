@@ -1384,20 +1384,25 @@ class Arbiter:
 
             challenge_result = {"success": True, "roll": d20, "total": total, "boons": boons}
         else:
-            # Influence shift: leader subtracts d20, others add d20
+            # Influence shift: leader -1d20, collaborators -1d6, non-collaborators +1d6
             self._vprint(f"\n    [INFLUENCE SHIFT — LEADERSHIP CRISIS]")
             leader_loss = roll(20)
             leader_faction["influence"] = leader_faction.get("influence", 0) - leader_loss
-            self._vprint(f"    [Influence: {leading_name} -{leader_loss} → {leader_faction['influence']}]")
+            self._vprint(f"    [Influence: {leading_name} -{leader_loss} (d20) → {leader_faction['influence']}]")
 
             for agent in self._factions:
                 fname = agent.faction_data["name"]
                 if fname == leading_name:
                     continue
-                gain = roll(20)
                 f = state.get_faction(fname)
-                f["influence"] = f.get("influence", 0) + gain
-                self._vprint(f"    [Influence: {fname} +{gain} → {f['influence']}]")
+                if fname in contributing_factions:
+                    loss = roll(6)
+                    f["influence"] = f.get("influence", 0) - loss
+                    self._vprint(f"    [Influence: {fname} -{loss} (d6, collaborated) → {f['influence']}]")
+                else:
+                    gain = roll(6)
+                    f["influence"] = f.get("influence", 0) + gain
+                    self._vprint(f"    [Influence: {fname} +{gain} (d6, withheld) → {f['influence']}]")
 
             # Check for faction elimination (influence < 0)
             eliminated = [f["name"] for f in state.factions if f.get("influence", 0) < 0]
