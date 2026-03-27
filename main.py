@@ -247,7 +247,6 @@ def write_final_summary(output_dir: str, state: SettlementState, all_actions: li
 
     _vprint(f"\nFinal state:       {final_state_path}")
     _vprint(f"Narrative summary: {narrative_path}")
-    print(f"\nGame chronicle:    {chronicle_path}")
 
     # Print chronicle to console in verbose mode
     if config.VERBOSE:
@@ -480,6 +479,8 @@ def main() -> None:
             os.rename(run_dir, final_dir)
             run_dir = final_dir
             _vprint(f"  Output renamed to: {run_dir}")
+
+    print(f"\nOutput: {run_dir}")
 
     # Print final scores
     print("\nFinal Victory Points:")

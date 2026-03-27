@@ -207,7 +207,7 @@ class Arbiter:
                             cultures=state.cultures,
                             existing_landmarks=state._data.get("landmarks", []),
                         )
-                        print(" done.\n")
+                        self._vprint(" done.\n")
                         structure = agent.parse_make_structure(make_out)
                         if structure:
                             s_name = structure.get("name", custom_make_name)
@@ -302,7 +302,7 @@ class Arbiter:
                 faction_narratives=_faction_narratives if narration_mode == "narrative" else None,
                 mode=narration_mode,
             )
-            print(" done.\n")
+            self._vprint(" done.\n")
             print(gm_output.content)
             self._logger.log(gm_output)
             outputs.append(gm_output.to_dict())
@@ -716,7 +716,7 @@ class Arbiter:
             context = MemoryContext.build(state, self._logger, self._memory_window, fname)
             self._vprint(f"\n    → {fname} deciding investments...", end="", flush=True)
             output = agent.run_investment(context, state.era, state.cultures)
-            print(" done.\n")
+            self._vprint(" done.\n")
 
             choice = agent.parse_investment_choice(output)
             purchased_any = False
@@ -774,7 +774,7 @@ class Arbiter:
                 culture_narrative = self._gm.narrate_culture_purchase(
                     state.era, cat, option, fname, state._data["name"]
                 )
-                print(" done.\n")
+                self._vprint(" done.\n")
                 print(culture_narrative.content)
                 self._logger.log(culture_narrative)
                 outputs.append(culture_narrative.to_dict())
@@ -937,11 +937,11 @@ class Arbiter:
             existing_places=existing_places,
             co_founders=co_founders or None,
         )
-        print(" done.\n")
+        self._vprint(" done.\n")
         place_data = founder_agent.parse_place_name(name_output)
         place_name = place_data.get("name", f"Unnamed {tier.title()}")
         faction_details = place_data.get("details", "")
-        print(f"    [{tier.upper()}: {place_name}]")
+        self._vprint(f"    [{tier.upper()}: {place_name}]")
         if faction_details:
             print(f"      {faction_details}")
         self._logger.log(name_output)
@@ -959,7 +959,7 @@ class Arbiter:
             state_summary=state.summary(),
             existing_places=existing_places,
         )
-        print(" done.\n")
+        self._vprint(" done.\n")
         gm_description = gm_output.content
         print(gm_description)
         self._logger.log(gm_output)
@@ -999,7 +999,7 @@ class Arbiter:
         old_strategy = cu["strategy_name"]
         old_make = cu["make_name"]
 
-        print(
+        self._vprint(
             f"\n    → {buyer_agent.faction_data['name']} naming the new {color} strategy "
             f"(L{new_level} culture)...",
             end="", flush=True,
@@ -1204,7 +1204,7 @@ class Arbiter:
                 culture_narrative = self._gm.narrate_culture_purchase(
                     state.era, cat, option, purchaser_str, state._data["name"]
                 )
-                print(" done.\n")
+                self._vprint(" done.\n")
                 print(culture_narrative.content)
                 self._logger.log(culture_narrative)
 
@@ -1314,11 +1314,11 @@ class Arbiter:
         opt_a, score_a = scored[0]
         opt_b, score_b = scored[1] if len(scored) > 1 else (None, 0)
 
-        print(f"      [Option scoring: {opt_a['option']}={score_a}, {opt_b['option'] if opt_b else '?'}={score_b}]")
+        self._vprint(f"      [Option scoring: {opt_a['option']}={score_a}, {opt_b['option'] if opt_b else '?'}={score_b}]")
 
         if score_a == score_b:
             choice = random.choice(options)
-            print(f"      [Tie — randomly chose {choice['option']}]")
+            self._vprint(f"      [Tie — randomly chose {choice['option']}]")
             return choice
         return opt_a
 
@@ -1334,7 +1334,7 @@ class Arbiter:
         # Draw challenge event and have GM localize it
         challenge_event = random.choice(CHALLENGE_EVENTS)
         difficulty = state.challenge_difficulty
-        print(f"    Challenge event: {challenge_event}")
+        self._vprint(f"    Challenge event: {challenge_event}")
         self._vprint(f"    Difficulty: {difficulty}")
 
         # GM narrates the challenge with regional specifics
@@ -1350,7 +1350,7 @@ class Arbiter:
             strategy_summary=strat_sum,
             previous_challenges=list(self._previous_challenges) if self._previous_challenges else None,
         )
-        print(" done.\n")
+        self._vprint(" done.\n")
         challenge_text = gm_challenge.content
         print(challenge_text)
         self._logger.log(gm_challenge)
@@ -1377,7 +1377,7 @@ class Arbiter:
             plan_output = leader_agent.run_challenge_plan(
                 state.era, challenge_text, cultures=state.cultures
             )
-            print(" done.\n")
+            self._vprint(" done.\n")
             leader_plan_text = plan_output.content
             print(leader_plan_text)
             self._logger.log(plan_output)
@@ -1668,7 +1668,7 @@ class Arbiter:
             result=challenge_result,
             state_summary=state.summary(),
         )
-        print(" done.\n")
+        self._vprint(" done.\n")
         print(outcome_output.content)
         self._logger.log(outcome_output)
         outputs.append(outcome_output.to_dict())
@@ -1695,7 +1695,7 @@ class Arbiter:
                 challenge_text=challenge_text,
                 state_summary=state.summary(),
             )
-            print(" done.\n")
+            self._vprint(" done.\n")
             print(boon_output.content)
             self._logger.log(boon_output)
             outputs.append(boon_output.to_dict())
@@ -1726,7 +1726,7 @@ class Arbiter:
             previous_era_names=list(self._era_names),
             previous_chronicles=list(self._era_chronicle),
         )
-        print(" done.\n")
+        self._vprint(" done.\n")
         print(gm_output.content)
         self._logger.log(gm_output)
         state.append_era_log(gm_output.content[:500])
