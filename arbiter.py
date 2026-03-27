@@ -94,7 +94,6 @@ class Arbiter:
             outputs = self._run_end_of_era_phase(state)
         else:
             return []
-        pause(era=state.era)
         return outputs
 
     # ── Strategy Phase ────────────────────────────────────────────────────────
