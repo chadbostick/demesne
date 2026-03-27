@@ -270,44 +270,32 @@ class Arbiter:
                 bonus_colors=bonus_colors if bonus_count > 0 else [],
                 tokens_after=dict(tokens), influence=faction["influence"])
 
-            # Brief in-character narrative (LLM, post-hoc flavor only)
-            prev_narr = self._last_faction_narratives.get(fname)
-            narrative_out = agent.run_strategy_narrative(
-                state.era, strategy, tokens_earned, cultures=state.cultures,
-                previous_narrative=prev_narr,
-            )
-            self._last_faction_narratives[fname] = narrative_out.content[:300]
-            print(f"\n  **{self._faction_label(faction)}**\n")
-            print(f"{narrative_out.content}\n")
-            self._logger.log(narrative_out)
-            outputs.append(narrative_out.to_dict())
             _STRATEGY_ACTIVITY = {
                 "pray": "prayer and devotion", "discuss": "discourse and debate",
                 "lead": "leadership and rallying", "organize": "planning and coordination",
                 "forage": "scouting and gathering",
             }
-            _faction_summaries.append({"name": fname, "activity": _STRATEGY_ACTIVITY.get(strategy, strategy), "tokens_earned": tokens_earned})
-            _faction_narratives.append(narrative_out.content)
+            _faction_summaries.append({
+                "name": fname,
+                "label": self._faction_label(faction),
+                "activity": _STRATEGY_ACTIVITY.get(strategy, strategy),
+                "tokens_earned": tokens_earned,
+            })
 
-            pause(f"  ── {fname} done. Press Space/Enter to continue or Esc to quit ──", era=state.era)
-
-        # ── GM strategy summary narration ─────────────────────────────────────
-        narration_mode = config.STRATEGY_NARRATION_MODE
-        if narration_mode != "off" and _faction_summaries:
-            self._vprint(f"\n    → GM summarizing the era's efforts...", end="", flush=True)
+        # ── Batched strategy narration (1 LLM call for all factions) ──────────
+        if _faction_summaries:
+            self._vprint(f"\n    → GM chronicling the era's efforts...", end="", flush=True)
             gm_output = self._gm.narrate_strategy_phase(
                 round_num=state.era,
                 state_summary=state.summary(),
                 faction_summaries=_faction_summaries,
-                faction_narratives=_faction_narratives if narration_mode == "narrative" else None,
-                mode=narration_mode,
+                mode="summary",
             )
             self._vprint(" done.\n")
             print(gm_output.content)
             self._logger.log(gm_output)
             outputs.append(gm_output.to_dict())
             self._last_strategy_summary = gm_output.content[:400]
-            pause("  ── Strategy phase complete. Press Space/Enter to continue or Esc to quit ──", era=state.era)
 
         return outputs
 
@@ -352,6 +340,22 @@ class Arbiter:
 
         color = color_for_cat(cat)
         return strat_for_color(color), color
+
+    def _extract_historical_figure(self, text: str, faction: str, era: int, role: str) -> dict | None:
+        """Extract a historical figure from narration text containing 'HISTORICAL FIGURE: name — deed'."""
+        import re
+        match = re.search(r"HISTORICAL FIGURE:\s*(.+?)\s*[—–-]\s*(.+)", text)
+        if match:
+            figure = {
+                "name": match.group(1).strip(),
+                "deed": match.group(2).strip(),
+                "faction": faction,
+                "era": era,
+                "role": role,
+                "status": "legendary",
+            }
+            return figure
+        return None
 
     def _pick_best_strategy(
         self, faction: dict, state: "SettlementState"
@@ -753,28 +757,24 @@ class Arbiter:
                     faction=fname, category=cat, level=lvl, option=option,
                     cost=cost, tokens_after=dict(tokens), cooperative=False)
 
-                # Generate historical figure for this cultural shift
-                figure = agent.name_historical_figure(
-                    state.era, "culture_reform",
-                    f"Led the adoption of {option} ({cat} L{lvl}) in the settlement"
-                )
-                if figure:
-                    figure.update({"faction": fname, "era": state.era, "role": "reformer", "status": "legendary"})
-                    state.add_historical_figure(figure)
-                    self._vprint(f"      [Historical figure: {figure['name']} — {figure['deed']}]")
-                    self._logger.log_event("historical_figure", **figure)
-
                 new_strat = f"{cat}_strategy"
                 new_make = f"{cat}_make"
                 state.unlock_strategy(new_strat)
                 state.unlock_make_option(new_make)
 
-                # GM chronicles this cultural shift — it's a big deal
+                # GM chronicles this cultural shift (includes historical figure)
                 self._vprint(f"\n    → GM chronicling cultural shift...", end="", flush=True)
                 culture_narrative = self._gm.narrate_culture_purchase(
                     state.era, cat, option, fname, state._data["name"]
                 )
                 self._vprint(" done.\n")
+
+                # Extract historical figure from narration
+                figure = self._extract_historical_figure(culture_narrative.content, fname, state.era, "reformer")
+                if figure:
+                    state.add_historical_figure(figure)
+                    self._vprint(f"      [Historical figure: {figure['name']} — {figure['deed']}]")
+                    self._logger.log_event("historical_figure", **figure)
                 print(culture_narrative.content)
                 self._logger.log(culture_narrative)
                 outputs.append(culture_narrative.to_dict())
@@ -1673,18 +1673,15 @@ class Arbiter:
         self._logger.log(outcome_output)
         outputs.append(outcome_output.to_dict())
 
-        # Generate historical figure for the challenge
-        if leader_agent:
-            event_desc = f"{'Led the settlement through' if success else 'Failed to prevent'} the crisis: {challenge_event}"
-            figure = leader_agent.name_historical_figure(
-                state.era, "crisis_leader" if success else "fallen_leader", event_desc
-            )
-            if figure:
-                status = "legendary" if success else "cautionary"
-                figure.update({"faction": leading_name, "era": state.era, "role": "crisis_leader", "status": status})
-                state.add_historical_figure(figure)
-                self._vprint(f"    [Historical figure: {figure['name']} — {figure['deed']}]")
-                self._logger.log_event("historical_figure", **figure)
+        # Extract historical figure from outcome narration
+        role = "crisis_leader" if success else "fallen_leader"
+        figure = self._extract_historical_figure(outcome_output.content, leading_name, state.era, role)
+        if figure:
+            if not success:
+                figure["status"] = "cautionary"
+            state.add_historical_figure(figure)
+            self._vprint(f"    [Historical figure: {figure['name']} — {figure['deed']}]")
+            self._logger.log_event("historical_figure", **figure)
 
         # ── Step 5: GM narrates the boon(s) if success ─────────────────────────
         if success and boons:

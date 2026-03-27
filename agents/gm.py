@@ -117,11 +117,12 @@ Connect the outcome to the settlement's larger arc:
 - If they FAILED: What weakness was exposed — was it structural, cultural, or leadership? \
   What was permanently lost? What desperate adaptation will define the next generation?
 
-Reference specific named historical figures, structures, and places. Show how this crisis \
-transformed not just the settlement's condition, but its character.
+Reference specific named historical figures, structures, and places. Name the individual \
+most associated with this crisis. End with their name and deed:
 
-VOICE CONSTRAINT: Write as a historian looking back across decades or centuries. No tokens, \
-rolls, victory points, or game mechanics.
+HISTORICAL FIGURE: [name] — [one sentence deed]
+
+VOICE CONSTRAINT: No tokens, rolls, victory points, or game mechanics.
 """
         return self._call_llm(prompt, round_num, "challenge_outcome", max_tokens=512)
 
@@ -156,7 +157,7 @@ Write 3-5 sentences per boon. Past tense, third-person omniscient.
 
 VOICE CONSTRAINT: Write as a historian. No tokens, rolls, victory points, or game mechanics.
 """
-        return self._call_llm(prompt, round_num, "boon_narration", max_tokens=512)
+        return self._call_llm(prompt, round_num, "boon_narration", max_tokens=384)
 
     def narrate_place_founding(
         self,
@@ -296,51 +297,51 @@ A CULTURAL SHIFT HAS TAKEN ROOT:
 The people of {settlement_name} have embraced a new way: {option} — a shift in how the community \
 understands {category}. This was driven by {purchaser}.
 
-This shift took root over decades or centuries — it was not a decree but a gradual transformation. \
-In 3-4 sentences, chronicle how this changed the community permanently. How do the children \
-of this generation grow up differently than their parents? What old ways were abandoned? \
-What new assumptions do people carry without questioning?
+This shift took root over decades or centuries. In 3-4 sentences, chronicle how this changed \
+the community permanently. Name the individual most responsible — someone whose name will be \
+remembered for this transformation. End with their name and deed in this format:
 
-VOICE CONSTRAINT: Write as a witness to living history, not a game commentator. Do NOT mention \
-tokens, victory points, unlocks, purchases, upgrades, levels, or any game mechanics. \
-No faction labels. No metagaming language. Describe the lived reality of this change.
+HISTORICAL FIGURE: [name] — [one sentence deed]
+
+VOICE CONSTRAINT: No tokens, victory points, unlocks, purchases, upgrades, levels, or game \
+mechanics. No faction labels. Describe the lived reality of this change.
 """
-        return self._call_llm(prompt, round_num, "culture_purchase", max_tokens=512)
+        return self._call_llm(prompt, round_num, "culture_purchase", max_tokens=384)
 
     def narrate_strategy_phase(
         self,
         round_num: int,
         state_summary: str,
         faction_summaries: list[dict],
-        faction_narratives: list[str] | None = None,
         mode: str = "summary",
     ) -> AgentOutput:
-        if mode == "narrative" and faction_narratives:
-            source_block = "WHAT THE PEOPLE DID THIS ERA:\n" + "\n\n".join(faction_narratives)
-        else:
-            lines = []
-            for fs in faction_summaries:
-                if fs["tokens_earned"] == 0:
-                    outcome = "their efforts yielded nothing"
-                elif fs["tokens_earned"] <= 2:
-                    outcome = "modest gains"
-                elif fs["tokens_earned"] <= 5:
-                    outcome = "strong results"
-                else:
-                    outcome = "an exceptional bounty"
-                lines.append(f"- {fs['name']}: focused on {fs['activity']} — {outcome}")
-            source_block = "WHAT HAPPENED:\n" + "\n".join(lines)
+        lines = []
+        for fs in faction_summaries:
+            if fs["tokens_earned"] == 0:
+                outcome = "their efforts yielded nothing"
+            elif fs["tokens_earned"] <= 2:
+                outcome = "modest gains"
+            elif fs["tokens_earned"] <= 5:
+                outcome = "strong results"
+            else:
+                outcome = "an exceptional bounty"
+            label = fs.get("label", fs["name"])
+            lines.append(f"- {label}: focused on {fs['activity']} — {outcome}")
+        source_block = "WHAT EACH FACTION DID:\n" + "\n".join(lines)
 
         prompt = f"""\
-You are the chronicler of a fantasy settlement. You record history as it unfolds.
+You are the chronicler of a fantasy settlement.
 
 SETTLEMENT STATE:
 {state_summary}
 
 {source_block}
 
-Decades or centuries have passed. Write 3-4 sentences summarizing what the settlement's people accomplished \
-across these decades or centuries. Describe the work of generations: what was built, what traditions took root, \
+Write a short chronicle of this age. For each faction, write 2-3 sentences in third person \
+describing what they accomplished across decades or centuries. Use their full name. Then end \
+with 1-2 sentences about what the settlement as a whole achieved and what remains fragile.
+
+Write as a historian. Describe the work of generations: what was built, what traditions took root, \
 how the landscape changed under sustained effort.
 
 End with a hint of what's unresolved or fragile — something the people haven't noticed, \
@@ -350,7 +351,7 @@ should feel that prosperity and crisis are two sides of the same coin.
 VOICE CONSTRAINT: Write as a historian. No tokens, rolls, victory points, strategies, or game \
 mechanics. Ground every observation in the lived reality of generations.
 """
-        return self._call_llm(prompt, round_num, "strategy_summary", max_tokens=512)
+        return self._call_llm(prompt, round_num, "strategy_summary", max_tokens=1024)
 
     def _call_llm(self, prompt: str, round_num: int, phase: str, max_tokens: int = 1024) -> AgentOutput:
         import anthropic

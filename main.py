@@ -390,15 +390,21 @@ def main() -> None:
     logger.log_event("initiative", era=0, rolls=initiative_rolls, order=initiative_order, leader=initiative_order[0])
     pause("  ── Initiative set. Press Space/Enter to continue or Esc to quit ──")
 
-    # ── Faction introductions (LLM) ──────────────────────────────────────────
+    # ── Faction introductions (LLM, parallelized) ──────────────────────────
     print("\n  ── The Settlers Arrive ──")
     all_faction_data = [state.get_faction(a.faction_data["name"]) for a in faction_agents]
-    for agent in faction_agents:
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _introduce(agent):
         fname = agent.faction_data["name"]
         neighbors = [f for f in all_faction_data if f["name"] != fname]
-        _vprint(f"\n    → {fname} introducing themselves...", end="", flush=True)
-        intro_output = agent.introduce_faction(location, terrain, neighbors)
-        _vprint(" done.\n")
+        return agent, agent.introduce_faction(location, terrain, neighbors)
+
+    with ThreadPoolExecutor(max_workers=len(faction_agents)) as executor:
+        intro_results = list(executor.map(lambda a: _introduce(a), faction_agents))
+
+    for agent, intro_output in intro_results:
+        fname = agent.faction_data["name"]
         intro = agent.parse_faction_intro(intro_output)
         if intro:
             new_name = intro.get("faction_name", fname)
