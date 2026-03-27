@@ -184,9 +184,14 @@ class Arbiter:
                 str(all_rolls[0]) if len(all_rolls) == 1
                 else f"{len(all_rolls)}d20 {all_rolls}"
             )
-            tokens = award_tokens(tokens, color, base_count, bonus_count)
+            if bonus_count > 0:
+                bonus_colors = self._pick_bonus_colors(faction, tokens, color, bonus_count, state)
+                tokens = award_tokens(tokens, color, base_count, bonus_count, bonus_colors)
+                bonus_note = f" + {bonus_count} " + ", ".join(bonus_colors)
+            else:
+                tokens = award_tokens(tokens, color, base_count, 0)
+                bonus_note = ""
             tokens_earned = base_count + bonus_count
-            bonus_note = f" + {bonus_count} any" if bonus_count > 0 else ""
             print(f"    {fname} [{stance}→{custom_strategy_name}] rolled {dice_display} → +{base_count} {color}{bonus_note}")
 
             tok_str = ", ".join(f"{c}:{n}" for c, n in tokens.items())
@@ -268,6 +273,69 @@ class Arbiter:
 
         color = color_for_cat(cat)
         return strat_for_color(color), color
+
+    def _pick_bonus_colors(
+        self, faction: dict, tokens: dict, base_color: str,
+        bonus_count: int, state: "SettlementState"
+    ) -> list[str]:
+        """
+        Pick colors for bonus tokens (from rolling a 20).
+        Fills the biggest goal-relevant shortfalls first, excluding the base color
+        since the faction is already earning that.
+        """
+        _all_colors = ["red", "blue", "green", "orange", "pink"]
+        goals = faction.get("goals", {})
+        cultures = state.cultures
+
+        # Simulate tokens after base award
+        sim_tokens = dict(tokens)
+        sim_tokens[base_color] = sim_tokens.get(base_color, 0)  # base not added yet but we want other colors
+
+        # Collect shortfalls across goal-relevant purchases
+        shortfalls: dict[str, int] = {}
+        target_cats = []
+        p = goals.get("primary", {})
+        if p.get("category"):
+            target_cats.append(p["category"])
+        for s in goals.get("secondary", []):
+            if s.get("category"):
+                target_cats.append(s["category"])
+        t = goals.get("tertiary", {})
+        if t.get("category"):
+            target_cats.append(t["category"])
+
+        for cat in target_cats:
+            cat_data = cultures.get(cat, {})
+            next_lvl = cat_data.get("level", 0) + 1
+            if next_lvl > 3 or not can_purchase(cat, next_lvl, cultures):
+                continue
+            cost = get_cost(cat, next_lvl)
+            for c, needed in cost.items():
+                if c == base_color:
+                    continue
+                short = needed - sim_tokens.get(c, 0)
+                if short > 0:
+                    shortfalls[c] = max(shortfalls.get(c, 0), short)
+
+        # Fill bonus tokens from largest shortfall first
+        result: list[str] = []
+        remaining = bonus_count
+        for c, short in sorted(shortfalls.items(), key=lambda x: x[1], reverse=True):
+            if remaining <= 0:
+                break
+            take = min(short, remaining)
+            result.extend([c] * take)
+            remaining -= take
+
+        # If still remaining, pick the color with the largest shortfall that isn't base
+        if remaining > 0:
+            fallback = next(
+                (c for c in sorted(shortfalls, key=lambda c: shortfalls[c], reverse=True)),
+                next(c for c in _all_colors if c != base_color),
+            )
+            result.extend([fallback] * remaining)
+
+        return result
 
     def _should_make_instead(self, faction: dict, state: "SettlementState") -> dict | None:
         """
