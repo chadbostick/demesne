@@ -49,10 +49,10 @@ def build_faction_data(ideology_name: str, faction_index: int) -> dict:
     }
 
 
-def write_final_summary(output_dir: str, state: SettlementState, all_actions: list[dict]) -> None:
+def write_final_summary(output_dir: str, state: SettlementState, all_actions: list[dict], all_events: list[dict]) -> None:
     final_state_path = os.path.join(output_dir, "final_state.json")
     with open(final_state_path, "w", encoding="utf-8") as f:
-        json.dump(state.to_dict(), f, indent=2)
+        json.dump({"state": state.to_dict(), "events": all_events}, f, indent=2)
 
     narrative_path = os.path.join(output_dir, "narrative_summary.txt")
     with open(narrative_path, "w", encoding="utf-8") as f:
@@ -97,6 +97,9 @@ def main() -> None:
     print(f"  Model      : {config.MODEL}")
     print(f"  Factions   : {', '.join(PROTOTYPE_IDEOLOGIES)}")
 
+    # Initialize logger early so pre-game events are captured
+    logger = ActionLogger(args.output_dir)
+
     # Build state and factions
     state = SettlementState(name=args.settlement_name)
     faction_agents = []
@@ -116,6 +119,7 @@ def main() -> None:
     print(f"\n  [GEOGRAPHY]")
     print(f"    Location : {location}")
     print(f"    Terrain  : {terrain}")
+    logger.log_event("geography", era=0, location=location, terrain=terrain)
 
     # ── Initiative rolls & species ───────────────────────────────────────────
     print("\n  [INITIATIVE ROLLS]")
@@ -129,14 +133,15 @@ def main() -> None:
         faction["species"] = species
         agent.faction_data = faction
         print(f"    {fname}: rolled {r} — {species}")
+        logger.log_event("species_roll", era=0, faction=fname, species=species)
 
     initiative_order = sorted(initiative_rolls, key=lambda n: initiative_rolls[n], reverse=True)
     state.set_initiative_order(initiative_order)
-    # Re-sync faction_data references after set_initiative_order changes leading_faction
     for agent in faction_agents:
         agent.faction_data = state.get_faction(agent.faction_data["name"])
     print(f"\n  Leading faction: {initiative_order[0]}")
     print(f"  Initiative order: {', '.join(initiative_order)}")
+    logger.log_event("initiative", era=0, rolls=initiative_rolls, order=initiative_order, leader=initiative_order[0])
     pause("  ── Initiative set. Press Space/Enter to continue or Esc to quit ──")
 
     # ── Faction introductions (LLM) ──────────────────────────────────────────
@@ -168,6 +173,10 @@ def main() -> None:
             print(f"  {new_name} ({agent.faction_data['species']} {org_type})")
             if description:
                 print(f"    {description}")
+            logger.log_event("faction_intro", era=0,
+                old_name=fname, new_name=new_name, species=agent.faction_data["species"],
+                ideology=agent.faction_data["ideology"], organization_type=org_type,
+                description=description)
         pause(f"  ── {agent.faction_data['name']} introduced. Press Space/Enter to continue or Esc to quit ──")
 
     # ── Settlement naming (leading faction, LLM) ─────────────────────────────
@@ -184,12 +193,12 @@ def main() -> None:
     print(f"  Settlement named: {settlement_name}")
     if landmark_desc:
         print(f"  Landmarks: {landmark_desc}")
+    logger.log_event("settlement_named", era=0, name=settlement_name, landmark_description=landmark_desc, named_by=state.leading_faction)
 
     pause("  ── Settlement established. Press Space/Enter to continue or Esc to quit ──")
 
     gm_agent = GMAgent()
     phase_engine = PhaseEngine()
-    logger = ActionLogger(args.output_dir)
 
     arbiter = Arbiter(
         phase_engine=phase_engine,
@@ -200,7 +209,7 @@ def main() -> None:
     )
 
     final_state = arbiter.run(state, max_eras=args.eras, output_dir=args.output_dir)
-    write_final_summary(args.output_dir, final_state, logger.all_actions)
+    write_final_summary(args.output_dir, final_state, logger.all_actions, logger.all_events)
 
     # Print final scores
     print("\nFinal Victory Points:")

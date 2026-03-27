@@ -166,6 +166,10 @@ class Arbiter:
                         )
                         print(f"      [Tokens now: {tok_str}]")
                         state.update_faction_tokens(fname, tokens)
+                        self._logger.log_event("make_exchange", era=state.era,
+                            faction=fname, give_color=color, give_amount=give,
+                            receive_color=receive_color, receive_amount=receive,
+                            tokens_after=dict(tokens))
 
                         # LLM describes the structure
                         print(f"    → {fname} describing their construction...", end="", flush=True)
@@ -187,6 +191,9 @@ class Arbiter:
                             s_desc = structure.get("description", "")
                             s_purpose = structure.get("purpose", "")
                             state.add_landmark(s_name, f"{s_desc} {s_purpose}".strip(), fname)
+                            self._logger.log_event("structure_built", era=state.era,
+                                faction=fname, name=s_name, location=s_loc,
+                                description=s_desc, purpose=s_purpose)
                             print(f"    [{s_name}]")
                             if s_loc:
                                 print(f"      Location: {s_loc}")
@@ -223,6 +230,12 @@ class Arbiter:
             tok_str = ", ".join(f"{c}:{n}" for c, n in tokens.items())
             print(f"      [Tokens now: {tok_str}]")
             state.update_faction_tokens(fname, tokens)
+            self._logger.log_event("strategy_roll", era=state.era,
+                faction=fname, stance=stance, strategy=custom_strategy_name,
+                color=color, rolls=all_rolls, base_earned=base_count,
+                bonus_earned=bonus_count,
+                bonus_colors=bonus_colors if bonus_count > 0 else [],
+                tokens_after=dict(tokens))
 
             # Brief in-character narrative (LLM, post-hoc flavor only)
             narrative_out = agent.run_strategy_narrative(state.era, strategy, tokens_earned, cultures=state.cultures)
@@ -586,6 +599,9 @@ class Arbiter:
                 print(f"      [UNLOCKED: {cat} L{lvl} — {option}]")
                 purchased_any = True
                 any_purchase_made = True
+                self._logger.log_event("culture_purchase", era=state.era,
+                    faction=fname, category=cat, level=lvl, option=option,
+                    cost=cost, tokens_after=dict(tokens), cooperative=False)
 
                 new_strat = f"{cat}_strategy"
                 new_make = f"{cat}_make"
@@ -677,6 +693,10 @@ class Arbiter:
                     notes.append(f"tertiary {t_cat} (L0, no VP yet)")
             note_str = f"  [{'; '.join(notes)}]" if notes else ""
             print(f"      {fname}: {vp} VP{note_str}")
+
+        self._logger.log_event("vp_update", era=state.era, scores=scores,
+            cultures=state.to_dict()["cultures"],
+            factions=[{"name": f["name"], "tokens": f["tokens"], "vp": f["victory_points"]} for f in state.factions])
 
         return outputs
 
@@ -881,6 +901,9 @@ class Arbiter:
                 )
                 print(f"    → PURCHASED: {cat} L{lvl} — {option}")
                 print(f"      Contributors: {contribs}")
+                self._logger.log_event("culture_purchase", era=state.era,
+                    category=cat, level=lvl, option=option, cost=cost,
+                    cooperative=True, contributors=pool)
 
                 # GM chronicles this cultural shift
                 print(f"\n    → GM chronicling cultural shift...", end="", flush=True)
@@ -1020,6 +1043,9 @@ class Arbiter:
         difficulty = state.challenge_difficulty
         print(f"    Challenge: [{cat['category']}] {cat['description']}")
         print(f"    Difficulty: {difficulty}")
+        self._logger.log_event("challenge_drawn", era=state.era,
+            category=cat["category"], description=cat["description"],
+            difficulty=difficulty, leader=leading_name)
 
         leading_name = state.leading_faction
         leader_faction = state.get_faction(leading_name)
@@ -1172,6 +1198,11 @@ class Arbiter:
             f" vs difficulty {difficulty} → {'SUCCESS' if success else 'FAILURE'}]"
         )
 
+        self._logger.log_event("challenge_resolved", era=state.era,
+            roll=d20, token_pool=token_pool, vp_bonus=leader_vp_bonus,
+            total=total, difficulty=difficulty, success=success,
+            donations=donation_parts)
+
         if success:
             boon = random.choice(PLACEHOLDER_BOONS)
             state.add_boon(boon)
@@ -1194,6 +1225,8 @@ class Arbiter:
             new_leader = new_order[0]
             print(f"    [New leading faction: {new_leader}]")
             print(f"    [New initiative order: {', '.join(new_order)}]")
+            self._logger.log_event("initiative_reroll", era=state.era,
+                rolls=new_initiative, order=new_order, new_leader=new_leader)
             challenge_result = {"success": False, "roll": d20, "total": total, "new_leader": new_leader}
 
         state.advance_difficulty(failed=not success)
@@ -1270,6 +1303,7 @@ class Arbiter:
         summary = {
             "era": state.era,
             "state": state.to_dict(),
+            "events": self._logger.events_for_era(state.era),
             "outputs": era_outputs,
         }
         with open(f"{prefix}_summary.json", "w", encoding="utf-8") as f:
