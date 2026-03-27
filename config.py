@@ -15,3 +15,12 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 #   narrative — GM gets full faction narrative texts and synthesizes
 #   off       — no GM narration after strategy phase
 STRATEGY_NARRATION_MODE = "summary"
+
+# Culture preference mode: "deterministic" | "llm"
+#   deterministic — hardcoded preference tables (no API cost, default)
+#   llm           — LLM generates preferences at faction creation (deferred)
+CULTURE_PREFERENCE_MODE = "deterministic"
+
+# Faction count range (random between min/max if --factions not specified)
+MIN_FACTIONS = 2
+MAX_FACTIONS = 5

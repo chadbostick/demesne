@@ -21,7 +21,7 @@ from agents.gm import GMAgent
 from phases.engine import PhaseEngine
 from logger import ActionLogger
 from arbiter import Arbiter
-from mechanics.ideologies import IDEOLOGIES, PROTOTYPE_IDEOLOGIES
+from mechanics.ideologies import IDEOLOGIES
 from mechanics.strategies import STRATEGIC_STANCES
 from mechanics.worldbuilding import LOCATIONS, TERRAINS, DND5_RACES
 
@@ -46,6 +46,7 @@ def build_faction_data(ideology_name: str, faction_index: int) -> dict:
             "tertiary": id_["tertiary"],
         },
         "needs_reconsideration": False,
+        "culture_preferences": id_.get("culture_preferences", {}),
     }
 
 
@@ -84,18 +85,27 @@ def main() -> None:
         "--memory-window", type=int, default=config.MEMORY_WINDOW,
         help="Recent actions in agent context"
     )
+    parser.add_argument(
+        "--factions", type=int, default=0,
+        help=f"Number of factions ({config.MIN_FACTIONS}-{config.MAX_FACTIONS}, random if not set)"
+    )
     args = parser.parse_args()
 
     if not config.ANTHROPIC_API_KEY:
         print("ERROR: ANTHROPIC_API_KEY is not set. Create a .env file or export the variable.")
         sys.exit(1)
 
+    # Select random ideologies
+    num_factions = args.factions or random.randint(config.MIN_FACTIONS, config.MAX_FACTIONS)
+    num_factions = max(config.MIN_FACTIONS, min(num_factions, len(IDEOLOGIES)))
+    chosen_ideologies = random.sample(list(IDEOLOGIES.keys()), num_factions)
+
     print(f"Demesne simulation starting...")
     print(f"  Settlement : {args.settlement_name}")
     print(f"  Eras       : {args.eras}")
     print(f"  Output dir : {args.output_dir}")
     print(f"  Model      : {config.MODEL}")
-    print(f"  Factions   : {', '.join(PROTOTYPE_IDEOLOGIES)}")
+    print(f"  Factions   : {num_factions} — {', '.join(chosen_ideologies)}")
 
     # Initialize logger early so pre-game events are captured
     logger = ActionLogger(args.output_dir)
@@ -103,7 +113,7 @@ def main() -> None:
     # Build state and factions
     state = SettlementState(name=args.settlement_name)
     faction_agents = []
-    for i, ideology_name in enumerate(PROTOTYPE_IDEOLOGIES):
+    for i, ideology_name in enumerate(chosen_ideologies):
         faction_data = build_faction_data(ideology_name, i)
         faction_data["current_stance"] = random.choice(list(STRATEGIC_STANCES.keys()))
         state.add_faction(faction_data)

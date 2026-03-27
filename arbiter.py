@@ -118,7 +118,7 @@ class Arbiter:
                 if faction.get("needs_reconsideration", False):
                     context = MemoryContext.build(state, self._logger, self._memory_window, fname)
                     print(f"\n    → {fname} reconsidering stance (LLM)...", end="", flush=True)
-                    output = agent.run_strategy(context, state.era, state._data["available_strategies"])
+                    output = agent.run_strategy(context, state.era, state._data["available_strategies"], cultures=state.cultures)
                     print(" done.\n")
                     print(output.content)
                     self._logger.log(output)

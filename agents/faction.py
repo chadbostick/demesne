@@ -117,6 +117,30 @@ class FactionAgent(BaseAgent):
             )
         return "\n".join(lines)
 
+    def _culture_preferences_block(self, cultures: dict) -> str:
+        """Render this faction's culture preferences for unpurchased levels only."""
+        prefs = self.faction_data.get("culture_preferences", {})
+        if not prefs:
+            return ""
+        label_map = {
+            "must-have": "want",
+            "preferred": "lean toward",
+            "indifferent": "indifferent to",
+            "antithesis": "oppose",
+        }
+        lines = ["YOUR CULTURE PREFERENCES (unpurchased levels only):"]
+        for cat, levels in prefs.items():
+            current_level = cultures.get(cat, {}).get("level", 0)
+            for lvl in sorted(levels.keys()):
+                if lvl <= current_level:
+                    continue
+                opts = levels[lvl]
+                parts = []
+                for opt_name, label in opts.items():
+                    parts.append(f"{label_map.get(label, label)} {opt_name}")
+                lines.append(f"  {cat} L{lvl}: {', '.join(parts)}")
+        return "\n".join(lines)
+
     # ── Phase-specific run methods ─────────────────────────────────────────────
 
     def _stance_descriptions(self) -> str:
@@ -142,11 +166,14 @@ class FactionAgent(BaseAgent):
         return "\n".join(lines)
 
     def run_strategy(
-        self, context: dict, round_num: int, available_strategies: list[str]
+        self, context: dict, round_num: int, available_strategies: list[str],
+        cultures: dict | None = None,
     ) -> AgentOutput:
         tokens = context.get("own_tokens") or self.faction_data["tokens"]
         recent = self._recent_block(context)
         current_stance = self.faction_data.get("current_stance") or "pursue_primary"
+        prefs_block = self._culture_preferences_block(cultures) if cultures else ""
+        prefs_section = f"\n{prefs_block}\n" if prefs_block else ""
 
         prompt = f"""\
 You are {self.faction_data['name']}, a {self.faction_data['organization_type']} of {self.faction_data['species']}.
@@ -164,6 +191,7 @@ SETTLEMENT STATE:
 
 COOPERATION APPROACH: {self.ideology.get('cooperation_currency', '')}
 BETRAYAL TENDENCY: {self.ideology.get('betrayal_pattern', '')}
+{prefs_section}
 
 YOUR CURRENT STANCE: {current_stance}
 (You may maintain this stance or choose a new one.)
@@ -209,6 +237,8 @@ SETTLEMENT STATE:
 {context.get('state_summary', '')}
 
 {self._available_cultures_block(cultures)}
+
+{self._culture_preferences_block(cultures)}
 
 {recent}
 

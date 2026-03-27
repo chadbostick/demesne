@@ -1247,5 +1247,6 @@ IDEOLOGIES: dict = {
     },
 }
 
-# Prototype roster — 4 ideologies chosen for maximum behavioral contrast
-PROTOTYPE_IDEOLOGIES = ["Tyrant", "Progressionist", "Investor", "Mystic"]
+# Merge culture preferences into ideology dicts at import time
+from mechanics.culture_preferences import merge_preferences
+merge_preferences(IDEOLOGIES)
