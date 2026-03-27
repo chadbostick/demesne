@@ -122,6 +122,53 @@ VOICE CONSTRAINT: Write as a historian. No tokens, rolls, victory points, or gam
 """
         return self._call_llm(prompt, round_num, "boon_narration", max_tokens=512)
 
+    def narrate_place_founding(
+        self,
+        round_num: int,
+        place_name: str,
+        tier: str,
+        tier_context: str,
+        faction_details: str,
+        culture_trigger: dict,
+        state_summary: str,
+        existing_places: list[dict],
+    ) -> AgentOutput:
+        existing_block = ""
+        if existing_places:
+            lines = ["EXISTING PLACES IN THE SETTLEMENT:"]
+            for p in existing_places:
+                desc = p.get("gm_description", p.get("faction_details", ""))
+                lines.append(f"  - {p['name']} ({p['tier']}): {desc[:100]}")
+            existing_block = "\n".join(lines)
+
+        prompt = f"""\
+You are the chronicler of a fantasy settlement. You record history as it unfolds.
+
+SETTLEMENT STATE:
+{state_summary}
+
+{existing_block}
+
+A NEW {tier.upper()} HAS BEEN FOUNDED: {place_name}
+
+{tier_context}
+
+THE FOUNDERS DESCRIBE IT AS:
+{faction_details}
+
+CULTURE THAT SPARKED THIS: {culture_trigger['option']} ({culture_trigger['category']} L{culture_trigger['level']})
+
+As the settlement's chronicler, describe where this {tier} sits in the landscape and how it \
+relates to existing places. What does it look like from the road? How does it fit into — or \
+stand apart from — the growing settlement? What role does it play?
+
+Write 3-4 sentences. Place it spatially: directions, distances, landmarks, terrain features. \
+Make it feel like a real place on a real map.
+
+VOICE CONSTRAINT: Write as a historian and cartographer. No game mechanics, tokens, or metagaming.
+"""
+        return self._call_llm(prompt, round_num, "place_founding", max_tokens=384)
+
     def narrate_end_of_era(
         self,
         context: dict,

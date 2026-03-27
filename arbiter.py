@@ -610,6 +610,9 @@ class Arbiter:
                 self._logger.log(culture_narrative)
                 outputs.append(culture_narrative.to_dict())
 
+                # Found a new place (village/town/city-state)
+                self._found_place(state, lvl, cat, option, agent, [fname], outputs)
+
                 # Check if this purchase raised a color's level → rename
                 color = CULTURE_TREE[cat]["unlocks_color"]
                 self._check_color_level_up(state, color, cat, option, agent, outputs)
@@ -691,6 +694,120 @@ class Arbiter:
             factions=[{"name": f["name"], "tokens": f["tokens"], "vp": f["victory_points"]} for f in state.factions])
 
         return outputs
+
+    def _found_place(
+        self,
+        state: "SettlementState",
+        level: int,
+        category: str,
+        option: str,
+        founder_agent: "FactionAgent",
+        founder_names: list[str],
+        outputs: list[dict],
+    ) -> None:
+        """After a culture purchase, found a new place (village/town/city-state)."""
+        from state.settlement import SettlementState
+        tier = SettlementState.TIER_FOR_LEVEL.get(level, "village")
+        existing_places = state._data.get("places", [])
+
+        # Build tier context
+        count = state.count_places_by_tier(tier)
+        if level == 1:
+            if count == 0:
+                tier_context = (
+                    "The scattered camps are coalescing. For the first time, people are building "
+                    "something permanent — the first village. This is the moment the settlement "
+                    "stops being a collection of survivors and becomes a community."
+                )
+            else:
+                tier_context = (
+                    f"A new village springs up alongside the {count} existing one{'s' if count > 1 else ''}. "
+                    "The settlement's footprint is growing as people spread across the land."
+                )
+        elif level == 2:
+            if count == 0:
+                tier_context = (
+                    "One of the villages has grown beyond its boundaries. What was once a cluster "
+                    "of homes is now a large town — the center of trade and organization for the "
+                    "surrounding communities. Roads converge here. Markets form."
+                )
+            else:
+                tier_context = (
+                    f"The settlement continues to urbanize. A village grows into a town, or an "
+                    f"existing town gains a new borough or absorbs nearby farmsteads. "
+                    f"There are now {count + 1} major population centers."
+                )
+        elif level == 3:
+            if count == 0:
+                tier_context = (
+                    "The largest town has become a city-state — a sovereign power with walls, "
+                    "institutions, and influence that extends far beyond the original 10km territory. "
+                    "This is no longer a frontier settlement. It is a nation being born."
+                )
+            else:
+                tier_context = (
+                    f"The city-state's power grows. New vassal territories, conquered lands, or "
+                    f"allied regions expand its reach. With {count + 1} major centers of power, "
+                    f"this civilization is becoming one of the largest forces in the known world."
+                )
+        else:
+            tier_context = ""
+
+        culture_trigger = {"category": category, "level": level, "option": option}
+        co_founders = [n for n in founder_names if n != founder_agent.faction_data["name"]]
+
+        # Faction names the place
+        print(f"\n    → {founder_agent.faction_data['name']} founding a {tier}...", end="", flush=True)
+        name_output = founder_agent.name_place(
+            era=state.era,
+            tier=tier,
+            tier_context=tier_context,
+            culture_trigger=culture_trigger,
+            location=state._data.get("location", ""),
+            terrain=state._data.get("terrain", ""),
+            existing_places=existing_places,
+            co_founders=co_founders or None,
+        )
+        print(" done.\n")
+        place_data = founder_agent.parse_place_name(name_output)
+        place_name = place_data.get("name", f"Unnamed {tier.title()}")
+        faction_details = place_data.get("details", "")
+        print(f"    [{tier.upper()}: {place_name}]")
+        if faction_details:
+            print(f"      {faction_details}")
+        self._logger.log(name_output)
+        outputs.append(name_output.to_dict())
+
+        # GM describes how it fits into the landscape
+        print(f"\n    → GM mapping the new {tier}...", end="", flush=True)
+        gm_output = self._gm.narrate_place_founding(
+            round_num=state.era,
+            place_name=place_name,
+            tier=tier,
+            tier_context=tier_context,
+            faction_details=faction_details,
+            culture_trigger=culture_trigger,
+            state_summary=state.summary(),
+            existing_places=existing_places,
+        )
+        print(" done.\n")
+        gm_description = gm_output.content
+        print(gm_description)
+        self._logger.log(gm_output)
+        outputs.append(gm_output.to_dict())
+
+        # Store the place
+        place = {
+            "name": place_name,
+            "tier": tier,
+            "founded_era": state.era,
+            "founded_by": founder_names,
+            "culture_trigger": culture_trigger,
+            "faction_details": faction_details,
+            "gm_description": gm_description,
+        }
+        state.add_place(place)
+        self._logger.log_event("place_founded", era=state.era, **place)
 
     def _check_color_level_up(
         self,
@@ -907,13 +1024,15 @@ class Arbiter:
                 print(culture_narrative.content)
                 self._logger.log(culture_narrative)
 
-                # Check if this purchase raised a color's level → rename
-                # Largest contributor renames
+                # Found a new place — largest contributor names it
                 top_contributor = max(pool, key=lambda fn: sum(pool[fn].values()))
                 top_agent = next(
                     (a for a in self._factions if a.faction_data["name"] == top_contributor),
                     self._factions[0],
                 )
+                self._found_place(state, lvl, cat, option, top_agent, list(pool.keys()), [])
+
+                # Check if this purchase raised a color's level → rename
                 color = CULTURE_TREE[cat]["unlocks_color"]
                 self._check_color_level_up(state, color, cat, option, top_agent, [])
 

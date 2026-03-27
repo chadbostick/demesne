@@ -723,6 +723,77 @@ Nothing else.
         except json.JSONDecodeError:
             return {}
 
+    def name_place(
+        self,
+        era: int,
+        tier: str,
+        tier_context: str,
+        culture_trigger: dict,
+        location: str,
+        terrain: str,
+        existing_places: list[dict],
+        co_founders: list[str] | None = None,
+    ) -> "AgentOutput":
+        """
+        After a culture purchase, the founding faction(s) name the new place
+        and describe its character.
+        """
+        culture_block = self._cultural_identity_block(
+            {culture_trigger["category"]: {"level": culture_trigger["level"], "options_chosen": [culture_trigger["option"]]}}
+        )
+
+        existing_block = ""
+        if existing_places:
+            lines = ["EXISTING PLACES:"]
+            for p in existing_places:
+                lines.append(f"  - {p['name']} ({p['tier']})")
+            existing_block = "\n".join(lines)
+
+        co_founders_note = ""
+        if co_founders:
+            co_founders_note = f"\nCo-founded with: {', '.join(co_founders)}"
+
+        prompt = f"""\
+You are {self.faction_data['name']}, a {self.faction_data['organization_type']} of {self.faction_data['species']}.
+
+{self._ideology_block()}
+
+SETTLEMENT GEOGRAPHY:
+  Location: {location}
+  Terrain: {terrain}
+
+{existing_block}
+
+{tier_context}
+
+The culture that sparked this: {culture_trigger['option']} ({culture_trigger['category']} L{culture_trigger['level']}).
+{co_founders_note}
+
+Name this {tier} and describe what makes it distinctive — its character, quirks, what a traveler \
+would notice first. Ground it in your people's species, ideology, and this land's geography.
+
+Output in this exact format:
+
+<place_name>
+{{
+  "name": "<proper name for this {tier}>",
+  "details": "<2-3 sentences: character, quirks, what makes it unique>"
+}}
+</place_name>
+
+Nothing else.
+"""
+        return self._call_llm(prompt, era, "place_naming", max_tokens=256)
+
+    def parse_place_name(self, output: "AgentOutput") -> dict:
+        match = re.search(r"<place_name>(.*?)</place_name>", output.content, re.DOTALL)
+        if not match:
+            return {}
+        try:
+            return json.loads(match.group(1).strip())
+        except json.JSONDecodeError:
+            return {}
+
     # ── Output parsers ─────────────────────────────────────────────────────────
 
     def parse_strategy_choice(self, output: AgentOutput) -> dict:

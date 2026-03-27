@@ -38,6 +38,7 @@ class SettlementState:
             "current_challenge": None,
             "boons": [],
             "landmarks": [],
+            "places": [],
             "initiative_order": [],
             "location": None,
             "terrain": None,
@@ -98,6 +99,40 @@ class SettlementState:
 
     def set_landmark_description(self, description: str) -> None:
         self._data["landmark_description"] = description
+
+    # ── Places (villages, towns, city-states) ────────────────────────────────
+
+    TIER_FOR_LEVEL = {1: "village", 2: "town", 3: "city-state"}
+
+    def add_place(self, place: dict) -> None:
+        """Add a named place (village/town/city-state) to the settlement."""
+        self._data["places"].append(place)
+
+    def count_places_by_tier(self, tier: str) -> int:
+        return sum(1 for p in self._data["places"] if p.get("tier") == tier)
+
+    def places_summary(self) -> str:
+        if not self._data["places"]:
+            return "Places: scattered camps only, no villages yet"
+        lines = ["Places:"]
+        for p in self._data["places"]:
+            lines.append(f"  {p['tier'].title()}: {p['name']} (era {p.get('founded_era', '?')})")
+        return "\n".join(lines)
+
+    def settlement_stage(self) -> str:
+        """Describe the current stage of settlement development."""
+        places = self._data["places"]
+        if not places:
+            return "scattered camps"
+        tiers = [p["tier"] for p in places]
+        if "city-state" in tiers:
+            n = tiers.count("city-state")
+            return f"city-state ({n} major center{'s' if n > 1 else ''})"
+        if "town" in tiers:
+            n = tiers.count("town")
+            return f"town{'s' if n > 1 else ''} and villages"
+        n = len(places)
+        return f"{n} village{'s' if n > 1 else ''}"
 
     # ── Era management ────────────────────────────────────────────────────────
 
@@ -198,6 +233,8 @@ class SettlementState:
             lines.append(f"Geography: {d.get('terrain', '?')} {d.get('location', '?')}")
         if d.get("landmark_description"):
             lines.append(f"Landmarks: {d['landmark_description']}")
+        lines.append(f"Stage: {self.settlement_stage()}")
+        lines.append(self.places_summary())
         lines += [
             self.faction_summary(),
             self.culture_summary(),
