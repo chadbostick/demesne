@@ -787,18 +787,27 @@ class Arbiter:
                 print(f"\n    Evaluating: {cat} L{lvl} — {option} (costs {cost_str})")
                 print(f"      [Score: {option}={score}, {other_option}={other_score}]")
 
-                # Show per-faction token state
+                # Show per-faction token state and willingness
+                willing_factions = []
                 for f in state.factions:
                     tok_str = ", ".join(f"{c}:{n}" for c, n in f["tokens"].items() if n > 0) or "none"
-                    print(f"      {f['name']}: [{tok_str}]")
+                    benefits = self._faction_benefits_from(f, cat)
+                    status = "willing" if benefits else "unwilling (not their goal)"
+                    print(f"      {f['name']}: [{tok_str}] — {status}")
+                    if benefits:
+                        willing_factions.append(f)
 
-                # Try to pool: for each color needed, take from richest faction(s)
+                if not willing_factions:
+                    print(f"    → SKIPPED — no faction has {cat} in their goals")
+                    continue
+
+                # Try to pool: only from willing factions, richest first
                 pool: dict[str, dict[str, int]] = {}
                 short_colors: list[str] = []
 
                 for color, needed in cost.items():
                     remaining = needed
-                    for f in sorted(state.factions, key=lambda f: f["tokens"].get(color, 0), reverse=True):
+                    for f in sorted(willing_factions, key=lambda f: f["tokens"].get(color, 0), reverse=True):
                         available = f["tokens"].get(color, 0)
                         take = min(available, remaining)
                         if take > 0:
@@ -865,13 +874,7 @@ class Arbiter:
         return made_any
 
     def _cooperative_upgrades(self, factions: list[dict], cultures: dict) -> list[dict]:
-        """Return upgrades no single faction can afford but all factions together can."""
-        # Sum all faction tokens
-        combined: dict = {}
-        for f in factions:
-            for c, n in f["tokens"].items():
-                combined[c] = combined.get(c, 0) + n
-
+        """Return upgrades that willing factions can afford together but not alone."""
         coop = []
         for cat, cat_data in cultures.items():
             next_lvl = cat_data["level"] + 1
@@ -880,36 +883,70 @@ class Arbiter:
             if not can_purchase(cat, next_lvl, cultures):
                 continue
             cost = get_cost(cat, next_lvl)
-            # Only affordable combined, not by any single faction
-            if not self._can_afford(combined, cost):
+
+            # Only consider factions that benefit from this category
+            willing = [f for f in factions if self._faction_benefits_from(f, cat)]
+            if not willing:
                 continue
-            if any(self._can_afford(dict(f["tokens"]), cost) for f in factions):
+
+            # Sum willing factions' tokens
+            willing_combined: dict = {}
+            for f in willing:
+                for c, n in f["tokens"].items():
+                    willing_combined[c] = willing_combined.get(c, 0) + n
+
+            # Affordable by willing factions combined, not by any single one
+            if not self._can_afford(willing_combined, cost):
+                continue
+            if any(self._can_afford(dict(f["tokens"]), cost) for f in willing):
                 continue
             for opt in CULTURE_TREE[cat]["levels"][next_lvl]["options"]:
                 coop.append({"category": cat, "level": next_lvl, "option": opt, "cost": cost})
         return coop
 
     def _score_coop_option(self, opt: dict, factions: list[dict]) -> int:
-        """Score a culture option based on faction goal alignment."""
+        """Score a culture option based on faction goal alignment.
+        Scores both direct option matches AND category-path alignment
+        (a faction benefits from any purchase in a category they need)."""
         option_name = opt["option"].lower()
         cat = opt["category"]
         score = 0
         for f in factions:
             goals = f.get("goals", {})
             p = goals.get("primary", {})
-            if p.get("category") == cat and p.get("option", "").lower() == option_name:
-                score += 3
-            elif p.get("enemy_option", "").lower() == option_name:
-                score -= 2
+            if p.get("category") == cat:
+                if p.get("option", "").lower() == option_name:
+                    score += 3  # direct goal match
+                elif p.get("enemy_option", "").lower() == option_name:
+                    score -= 2  # enemy option
+                else:
+                    score += 2  # category on primary path (prerequisite)
             for s in goals.get("secondary", []):
-                if s.get("category") == cat and s.get("option", "").lower() == option_name:
-                    score += 2
-                elif s.get("enemy_option", "").lower() == option_name:
-                    score -= 1
+                if s.get("category") == cat:
+                    if s.get("option", "").lower() == option_name:
+                        score += 2
+                    elif s.get("enemy_option", "").lower() == option_name:
+                        score -= 1
+                    else:
+                        score += 1  # category on secondary path
             t = goals.get("tertiary", {})
             if t.get("category") == cat:
                 score += 1
         return score
+
+    def _faction_benefits_from(self, faction: dict, category: str) -> bool:
+        """Check if a faction has this category in any of their goals."""
+        goals = faction.get("goals", {})
+        p = goals.get("primary", {})
+        if p.get("category") == category:
+            return True
+        for s in goals.get("secondary", []):
+            if s.get("category") == category:
+                return True
+        t = goals.get("tertiary", {})
+        if t.get("category") == category:
+            return True
+        return False
 
     def _pick_preferred_option(self, options: list[dict], factions: list[dict]) -> dict:
         """
