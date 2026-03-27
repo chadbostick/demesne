@@ -63,7 +63,7 @@ CULTURE_PREFERENCES: dict = {
             3: {"Manufacturing": "preferred", "Mining": "indifferent"},
         },
         "natural_affinity": {
-            1: {"Earth": "indifferent", "Water": "must-have"},
+            1: {"Earth": "antithesis", "Water": "must-have"},
             2: {"Air": "must-have", "Fire": "antithesis"},
             3: {"Light": "preferred", "Dark": "indifferent"},
         },
@@ -437,7 +437,7 @@ CULTURE_PREFERENCES: dict = {
             3: {"Class": "must-have", "Meritocracy": "antithesis"},
         },
         "values": {
-            1: {"Strength": "indifferent", "Knowledge": "must-have"},
+            1: {"Strength": "antithesis", "Knowledge": "must-have"},
             2: {"Talent": "must-have", "Skill": "antithesis"},
             3: {"Prestige": "preferred", "Power": "indifferent"},
         },
