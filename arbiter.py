@@ -152,17 +152,13 @@ class Arbiter:
                     give = tokens.get(color, 0)  # spend all available tokens of this color
                     receive = make_receive_for_level(color_level, give)
                     if give >= 1:
-                        # Distribute received tokens: cover goal shortfalls first, then primary goal color
-                        receive_colors = self._pick_make_receive_colors(faction, tokens, color, receive, state)
+                        receive_color = self._pick_make_receive_color(faction, tokens, color, state)
+                        receive_colors = [receive_color] * receive
                         tokens = apply_make_exchange(tokens, color, give, receive, receive_colors)
                         tok_str = ", ".join(f"{c}:{n}" for c, n in tokens.items())
-                        # Summarize received colors
-                        from collections import Counter
-                        recv_counts = Counter(receive_colors)
-                        recv_str = ", ".join(f"{n} {c}" for c, n in recv_counts.items())
                         print(
                             f"    {fname} [{custom_make_name}] gave {give} {color},"
-                            f" received {recv_str}"
+                            f" received {receive} {receive_color}"
                         )
                         print(f"      [Tokens now: {tok_str}]")
                         state.update_faction_tokens(fname, tokens)
@@ -274,18 +270,19 @@ class Arbiter:
     def _should_make_instead(self, faction: dict, state: "SettlementState") -> dict | None:
         """
         Check if the faction should override to a make exchange.
-        Returns {"reason": "..."} if make is better, None otherwise.
+        Returns {"reason": "...", "exchange_color": "..."} if make is better, None otherwise.
 
         Logic: for each goal-relevant culture the faction could buy next,
-        check if they have surplus tokens of one color that could be exchanged
-        to cover a shortfall in another color needed for that purchase.
+        check if they're short on exactly one color and have surplus of another
+        that could be exchanged to cover it. Make gives N tokens of one color
+        for N+level of another single color.
         """
         tokens = dict(faction["tokens"])
         goals = faction.get("goals", {})
         cultures = state.cultures
 
-        # Collect goal-relevant categories and their target options
-        target_cats: list[tuple[str, str]] = []  # (category, reason)
+        # Collect goal-relevant categories
+        target_cats: list[tuple[str, str]] = []
         p = goals.get("primary", {})
         if p.get("category"):
             target_cats.append((p["category"], f"primary goal ({p.get('option', '?')})"))
@@ -299,14 +296,12 @@ class Arbiter:
         for cat, reason in target_cats:
             cat_data = cultures.get(cat, {})
             next_lvl = cat_data.get("level", 0) + 1
-            if next_lvl > 3:
-                continue
-            if not can_purchase(cat, next_lvl, cultures):
+            if next_lvl > 3 or not can_purchase(cat, next_lvl, cultures):
                 continue
 
             cost = get_cost(cat, next_lvl)
 
-            # What colors are we short on, and what do we have surplus of?
+            # Find colors we're short on
             shortfall: dict[str, int] = {}
             for c, needed in cost.items():
                 have = tokens.get(c, 0)
@@ -314,56 +309,53 @@ class Arbiter:
                     shortfall[c] = needed - have
 
             if not shortfall:
-                # Already can afford — no need to make, just buy in investment phase
                 continue
 
-            total_short = sum(shortfall.values())
-
-            # Check each color for surplus that could be exchanged
-            for surplus_color in ["red", "blue", "green", "orange", "pink"]:
-                if surplus_color in cost:
-                    # Can't exchange the same color we need for the purchase
+            # For each short color, check if we have a surplus color to exchange
+            for short_color, short_amount in shortfall.items():
+                for surplus_color in ["red", "blue", "green", "orange", "pink"]:
+                    if surplus_color == short_color:
+                        continue
+                    # Surplus = tokens we have minus what this purchase needs of that color
                     surplus_available = tokens.get(surplus_color, 0) - cost.get(surplus_color, 0)
-                else:
-                    surplus_available = tokens.get(surplus_color, 0)
+                    if surplus_available < 1:
+                        continue
 
-                if surplus_available < 1:
-                    continue
+                    color_level = state.get_color_level(surplus_color)
+                    receive = make_receive_for_level(color_level, surplus_available)
 
-                color_level = state.get_color_level(surplus_color)
-                receive = make_receive_for_level(color_level, surplus_available)
-
-                if receive >= total_short:
-                    return {
-                        "reason": (
-                            f"can exchange {surplus_available} {surplus_color} → "
-                            f"{receive} tokens to cover {cat} L{next_lvl} shortfall "
-                            f"({reason})"
-                        ),
-                        "exchange_color": surplus_color,
-                    }
+                    if receive >= short_amount:
+                        return {
+                            "reason": (
+                                f"exchange {surplus_available} {surplus_color} → "
+                                f"{receive} {short_color} to cover {cat} L{next_lvl} "
+                                f"shortfall ({reason})"
+                            ),
+                            "exchange_color": surplus_color,
+                        }
 
         return None
 
-    def _pick_make_receive_colors(
-        self, faction: dict, tokens: dict, exchange_color: str,
-        receive_count: int, state: "SettlementState"
-    ) -> list[str]:
+    def _pick_make_receive_color(
+        self, faction: dict, tokens: dict, exchange_color: str, state: "SettlementState"
+    ) -> str:
         """
-        Decide which colors to receive from a make exchange.
-        Priority: cover shortfalls for affordable goal purchases, then primary goal color.
+        Decide which single color to receive from a make exchange.
+        Pick the color with the largest shortfall for a goal-relevant purchase.
+        Falls back to primary goal color.
         """
         _all_colors = ["red", "blue", "green", "orange", "pink"]
-        result: list[str] = []
-        remaining = receive_count
         goals = faction.get("goals", {})
         cultures = state.cultures
 
-        # Simulate tokens after the exchange (minus the give)
+        # Simulate tokens after the exchange (the give color will be spent)
         sim_tokens = dict(tokens)
-        sim_tokens[exchange_color] = 0  # will be spent
+        sim_tokens[exchange_color] = 0
 
-        # Find shortfalls for goal-relevant purchases
+        # Find the color with the biggest shortfall across goal-relevant purchases
+        best_color = None
+        best_shortfall = 0
+
         target_cats = []
         p = goals.get("primary", {})
         if p.get("category"):
@@ -376,31 +368,25 @@ class Arbiter:
             target_cats.append(t["category"])
 
         for cat in target_cats:
-            if remaining <= 0:
-                break
             cat_data = cultures.get(cat, {})
             next_lvl = cat_data.get("level", 0) + 1
             if next_lvl > 3 or not can_purchase(cat, next_lvl, cultures):
                 continue
             cost = get_cost(cat, next_lvl)
             for c, needed in cost.items():
-                if remaining <= 0:
-                    break
-                have = sim_tokens.get(c, 0)
-                short = needed - have
-                if short > 0:
-                    take = min(short, remaining)
-                    result.extend([c] * take)
-                    sim_tokens[c] = sim_tokens.get(c, 0) + take
-                    remaining -= take
+                if c == exchange_color:
+                    continue
+                short = needed - sim_tokens.get(c, 0)
+                if short > best_shortfall:
+                    best_shortfall = short
+                    best_color = c
 
-        # Fill remainder with primary goal color
-        if remaining > 0:
-            primary_cat = goals.get("primary", {}).get("category", "")
-            fallback = CULTURE_STRATEGY_COLOR.get(primary_cat, random.choice(_all_colors))
-            result.extend([fallback] * remaining)
+        if best_color:
+            return best_color
 
-        return result
+        # Fallback: primary goal color
+        primary_cat = goals.get("primary", {}).get("category", "")
+        return CULTURE_STRATEGY_COLOR.get(primary_cat, random.choice(_all_colors))
 
     def _find_make_option_by_color(self, color: str) -> dict | None:
         for opt in BASE_MAKE_OPTIONS.values():
