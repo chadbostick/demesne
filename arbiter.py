@@ -456,17 +456,45 @@ class Arbiter:
                 total[c] = total.get(c, 0) + n
         return total
 
+    def _next_level_needs(self, faction: dict, state: "SettlementState") -> dict[str, int]:
+        """
+        Compute tokens needed for the NEXT purchasable level of each goal category.
+        Only reserves for immediate next purchases, not the entire remaining path.
+        """
+        goals = faction.get("goals", {})
+        cultures = state.cultures
+        needs: dict[str, int] = {}
+
+        target_cats = []
+        p = goals.get("primary", {})
+        if p.get("category"):
+            target_cats.append(p["category"])
+        for s in goals.get("secondary", []):
+            if s.get("category"):
+                target_cats.append(s["category"])
+        t = goals.get("tertiary", {})
+        if t.get("category"):
+            target_cats.append(t["category"])
+
+        for cat in target_cats:
+            cat_data = cultures.get(cat, {})
+            next_lvl = cat_data.get("level", 0) + 1
+            if next_lvl > 3:
+                continue
+            cost = get_cost(cat, next_lvl)
+            for c, n in cost.items():
+                needs[c] = needs.get(c, 0) + n
+        return needs
+
     def _should_make_instead(self, faction: dict, state: "SettlementState") -> dict | None:
         """
         Check if the faction should override to a make exchange.
         Returns {"reason", "exchange_color", "receive_color", "give"} or None.
 
         Rules:
-        - Only exchange colors that are NOT needed for any upcoming goal purchase
-          (truly surplus — not needed anywhere on any goal path)
-        - Never trade one needed color for another needed color
-        - At L0 (1:1 exchange), only trade if the surplus color has zero
-          future need across all goal paths
+        - Reserve tokens needed for the NEXT purchasable level of each goal
+          category (not the entire remaining path — that's unreachable)
+        - Exchange tokens that exceed what's needed for all next-level purchases
         - Only exchange enough to cover the immediate shortfall
         """
         tokens = dict(faction["tokens"])
@@ -485,12 +513,8 @@ class Arbiter:
         if t.get("category"):
             target_cats.append((t["category"], f"tertiary goal ({t['category']})"))
 
-        # Compute total future needs across ALL goal categories
-        future_needs: dict[str, int] = {}
-        for cat, _ in target_cats:
-            path_cost = self._future_path_cost(cat, cultures)
-            for c, n in path_cost.items():
-                future_needs[c] = future_needs.get(c, 0) + n
+        # Compute tokens needed for NEXT level of each goal category
+        next_needs = self._next_level_needs(faction, state)
 
         for cat, reason in target_cats:
             cat_data = cultures.get(cat, {})
@@ -510,7 +534,6 @@ class Arbiter:
             if not shortfall:
                 continue
 
-            # For each short color, check if we have a truly surplus color to exchange
             for short_color, short_amount in shortfall.items():
                 for surplus_color in ["red", "blue", "green", "orange", "pink"]:
                     if surplus_color == short_color:
@@ -520,29 +543,15 @@ class Arbiter:
                     if have < 1:
                         continue
 
-                    # How much of this color is needed for THIS purchase?
-                    needed_for_purchase = cost.get(surplus_color, 0)
-                    # How much is needed across ALL future goal purchases?
-                    needed_for_future = future_needs.get(surplus_color, 0)
-
-                    # True surplus: tokens beyond what any goal path needs
-                    true_surplus = have - needed_for_future
-                    if true_surplus < 1:
-                        continue
-
-                    # Also must have enough left for this purchase's cost of this color
-                    exchangeable = have - max(needed_for_purchase, needed_for_future)
+                    # Reserve what's needed for next-level purchases across all goals
+                    reserved = next_needs.get(surplus_color, 0)
+                    exchangeable = have - reserved
                     if exchangeable < 1:
-                        # Special case: if this color has ZERO future need, we can exchange
-                        if needed_for_future == 0:
-                            exchangeable = have - needed_for_purchase
-                        if exchangeable < 1:
-                            continue
+                        continue
 
                     color_level = state.get_color_level(surplus_color)
                     multiplier = color_level + 1
 
-                    # Calculate minimum give to cover the shortfall
                     min_give = (short_amount + multiplier - 1) // multiplier
                     give = min(min_give, exchangeable)
                     receive = make_receive_for_level(color_level, give)
@@ -550,7 +559,7 @@ class Arbiter:
                     if receive >= short_amount:
                         return {
                             "reason": (
-                                f"exchange {give} {surplus_color} (no future need) → "
+                                f"exchange {give} {surplus_color} (surplus beyond next purchases) → "
                                 f"{receive} {short_color} to cover {cat} L{next_lvl} "
                                 f"shortfall ({reason})"
                             ),
