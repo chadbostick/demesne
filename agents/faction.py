@@ -422,13 +422,11 @@ labels, no fantasy clichés. Pure in-character settler voice.
             messages=[{"role": "user", "content": prompt}],
         )
         raw = message.content[0].text
-        state_patch = self._extract_state_patch(raw)
         return AgentOutput(
             agent_role=self.role,
             phase=phase,
             round=round_num,
             content=raw,
-            state_patch=state_patch,
         )
 
     def run_rename_strategy(
