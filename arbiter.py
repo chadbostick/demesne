@@ -166,16 +166,40 @@ class Arbiter:
                         )
                         print(f"      [Tokens now: {tok_str}]")
                         state.update_faction_tokens(fname, tokens)
-                        narrative_out = agent.run_strategy_narrative(
-                            state.era, "make", 0,
-                            make_info={"name": custom_make_name, "description": f"built by {fname}"},
+
+                        # LLM describes the structure
+                        print(f"    → {fname} describing their construction...", end="", flush=True)
+                        make_out = agent.run_make_narrative(
+                            era=state.era,
+                            make_type=custom_make_name,
+                            exchange_color=color,
+                            receive_color=receive_color,
+                            location=state._data.get("location", ""),
+                            terrain=state._data.get("terrain", ""),
                             cultures=state.cultures,
+                            existing_landmarks=state._data.get("landmarks", []),
                         )
-                        print(f"\n{narrative_out.content}\n")
-                        self._logger.log(narrative_out)
-                        outputs.append(narrative_out.to_dict())
-                        _faction_summaries.append({"name": fname, "activity": f"building ({custom_make_name})", "tokens_earned": 0})
-                        _faction_narratives.append(narrative_out.content)
+                        print(" done.\n")
+                        structure = agent.parse_make_structure(make_out)
+                        if structure:
+                            s_name = structure.get("name", custom_make_name)
+                            s_loc = structure.get("location", "")
+                            s_desc = structure.get("description", "")
+                            s_purpose = structure.get("purpose", "")
+                            state.add_landmark(s_name, f"{s_desc} {s_purpose}".strip(), fname)
+                            print(f"    [{s_name}]")
+                            if s_loc:
+                                print(f"      Location: {s_loc}")
+                            if s_desc:
+                                print(f"      Description: {s_desc}")
+                            if s_purpose:
+                                print(f"      Purpose: {s_purpose}")
+                        else:
+                            print(make_out.content)
+                        self._logger.log(make_out)
+                        outputs.append(make_out.to_dict())
+                        _faction_summaries.append({"name": fname, "activity": f"building ({structure.get('name', custom_make_name) if structure else custom_make_name})", "tokens_earned": 0})
+                        _faction_narratives.append(make_out.content)
                         pause(f"  ── {fname} done. Press Space/Enter to continue or Esc to quit ──", era=state.era)
                         continue
                 # Fall through to normal execution if make not possible

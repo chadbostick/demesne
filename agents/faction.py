@@ -380,6 +380,72 @@ voice and worldview. 2-3 sentences only.
             lines.append(f"  [Era {a['era']} / {a['phase']} / {a['agent']}]: {a['content'][:120]}...")
         return "\n".join(lines)
 
+    def run_make_narrative(
+        self,
+        era: int,
+        make_type: str,
+        exchange_color: str,
+        receive_color: str,
+        location: str,
+        terrain: str,
+        cultures: dict | None = None,
+        existing_landmarks: list[dict] | None = None,
+    ) -> "AgentOutput":
+        """
+        When a faction uses Make, describe the structure they build.
+        Returns structured JSON with name, location, description, purpose.
+        """
+        culture_block = self._cultural_identity_block(cultures) if cultures else ""
+        culture_section = f"\n{culture_block}\n" if culture_block else ""
+
+        landmarks_block = ""
+        if existing_landmarks:
+            lines = ["EXISTING STRUCTURES IN THE SETTLEMENT:"]
+            for lm in existing_landmarks:
+                lines.append(f"  - {lm['name']}: {lm.get('description', '')}")
+            landmarks_block = "\n".join(lines) + "\n"
+
+        prompt = f"""\
+You are {self.faction_data['name']}, a {self.faction_data['organization_type']} of {self.faction_data['species']}.
+
+{self._ideology_block()}
+{culture_section}
+SETTLEMENT GEOGRAPHY:
+  Location: {location}
+  Terrain: {terrain}
+
+{landmarks_block}
+Your people are building a {make_type} — a structure that will stand for generations. This is a \
+place where your community converts {exchange_color} effort into {receive_color} resources.
+
+Describe this structure. It should reflect your people's species, ideology, and history in this \
+settlement. Consider the geography and what already exists here.
+
+Output in this exact format:
+
+<make_structure>
+{{
+  "name": "<a proper name for this structure>",
+  "location": "<where in the settlement or surrounding area it stands — 1 sentence>",
+  "description": "<what it looks like physically — 1-2 sentences>",
+  "purpose": "<what it does for the community — 1 sentence>"
+}}
+</make_structure>
+
+Nothing else.
+"""
+        return self._call_llm(prompt, era, "make_structure", max_tokens=256)
+
+    def parse_make_structure(self, output: "AgentOutput") -> dict:
+        """Extract make_structure JSON. Returns {} on failure."""
+        match = re.search(r"<make_structure>(.*?)</make_structure>", output.content, re.DOTALL)
+        if not match:
+            return {}
+        try:
+            return json.loads(match.group(1).strip())
+        except json.JSONDecodeError:
+            return {}
+
     def run_strategy_narrative(
         self,
         era: int,
