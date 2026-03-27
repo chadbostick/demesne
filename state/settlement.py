@@ -39,6 +39,9 @@ class SettlementState:
             "boons": [],
             "landmarks": [],
             "initiative_order": [],
+            "location": None,
+            "terrain": None,
+            "landmark_description": None,
             "challenge_difficulty": 10,
             "challenges_failed": 0,
             "game_over": False,
@@ -96,6 +99,17 @@ class SettlementState:
     def unlock_make_option(self, make_name: str) -> None:
         if make_name not in self._data["available_make_options"]:
             self._data["available_make_options"].append(make_name)
+
+    # ── Geography ──────────────────────────────────────────────────────────────
+
+    def set_location(self, location: str) -> None:
+        self._data["location"] = location
+
+    def set_terrain(self, terrain: str) -> None:
+        self._data["terrain"] = terrain
+
+    def set_landmark_description(self, description: str) -> None:
+        self._data["landmark_description"] = description
 
     # ── Era management ────────────────────────────────────────────────────────
 
@@ -189,14 +203,21 @@ class SettlementState:
 
     def summary(self) -> str:
         d = self._data
-        return "\n".join([
+        lines = [
             f"Settlement: {d['name']} (Era {d['era']})",
+        ]
+        if d.get("location") or d.get("terrain"):
+            lines.append(f"Geography: {d.get('terrain', '?')} {d.get('location', '?')}")
+        if d.get("landmark_description"):
+            lines.append(f"Landmarks: {d['landmark_description']}")
+        lines += [
             self.faction_summary(),
             self.culture_summary(),
             f"Strategies available: {', '.join(d['available_strategies'])}",
             f"Current challenge: {d['current_challenge'] or 'none'}",
             f"Boons: {', '.join(d['boons']) if d['boons'] else 'none'}",
-        ])
+        ]
+        return "\n".join(lines)
 
     @property
     def era(self) -> int:

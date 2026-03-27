@@ -25,6 +25,7 @@ from arbiter import Arbiter
 from mechanics.ideologies import IDEOLOGIES, PROTOTYPE_IDEOLOGIES
 from mechanics.scoring import score_all_factions
 from mechanics.strategies import STRATEGIC_STANCES
+from mechanics.worldbuilding import LOCATIONS, TERRAINS
 
 
 def _empty_tokens() -> dict:
@@ -122,6 +123,15 @@ def main() -> None:
         # Keep faction_data and FactionAgent in sync via shared reference through state
         faction_agents[-1].faction_data = state.get_faction(faction_data["name"])
 
+    # ── Location & Terrain ────────────────────────────────────────────────────
+    location = random.choice(LOCATIONS)
+    terrain = random.choice(TERRAINS)
+    state.set_location(location)
+    state.set_terrain(terrain)
+    print(f"\n  [GEOGRAPHY]")
+    print(f"    Location : {location}")
+    print(f"    Terrain  : {terrain}")
+
     # ── Initiative rolls ──────────────────────────────────────────────────────
     print("\n  [INITIATIVE ROLLS]")
     initiative_rolls: dict[str, int] = {}
@@ -138,7 +148,23 @@ def main() -> None:
         agent.faction_data = state.get_faction(agent.faction_data["name"])
     print(f"\n  Leading faction: {initiative_order[0]}")
     print(f"  Initiative order: {', '.join(initiative_order)}")
-    pause("  ── Initiative set. Press Space/Enter to continue or Esc to quit ──")
+
+    # ── Settlement naming (leading faction, LLM) ─────────────────────────────
+    leader_agent = next(a for a in faction_agents if a.faction_data["name"] == initiative_order[0])
+    print(f"\n    → {initiative_order[0]} naming the settlement...", end="", flush=True)
+    naming_output = leader_agent.name_settlement(location, terrain)
+    print(" done.\n")
+    naming_choice = leader_agent.parse_settlement_name(naming_output)
+    settlement_name = naming_choice.get("name") or args.settlement_name
+    landmark_desc = naming_choice.get("description", "")
+    state._data["name"] = settlement_name
+    if landmark_desc:
+        state.set_landmark_description(landmark_desc)
+    print(f"  Settlement named: {settlement_name}")
+    if landmark_desc:
+        print(f"  Landmarks: {landmark_desc}")
+
+    pause("  ── Settlement established. Press Space/Enter to continue or Esc to quit ──")
 
     gm_agent = GMAgent()
     phase_engine = PhaseEngine()

@@ -513,6 +513,54 @@ Nothing else.
 """
         return self._call_llm(prompt, era, "rename_strategy", max_tokens=128)
 
+    def name_settlement(
+        self, location: str, terrain: str
+    ) -> "AgentOutput":
+        """
+        Leading faction names the settlement based on geography and ideology.
+        Returns a name and 3-sentence description of natural landmarks.
+        """
+        prompt = f"""\
+You are {self.faction_data['name']}, a {self.faction_data['organization_type']} of {self.faction_data['species']}.
+
+{self._ideology_block()}
+
+Your people have arrived at a new land to settle. The region is approximately 10km by 10km.
+
+GEOGRAPHY:
+  Location: {location}
+  Terrain: {terrain}
+
+As the leading faction, you have the honor of naming this settlement. Choose a name that reflects \
+what your people see when they look at this land — filtered through your ideology and worldview.
+
+Then describe the natural landmarks of this region in exactly 3 sentences. What rivers, ridges, \
+groves, shores, or formations define this place? Ground the description in the specific location \
+and terrain. Make the landscape vivid and real.
+
+Output your choice in this exact format:
+
+<settlement_name>
+{{
+  "name": "<settlement name>",
+  "description": "<3 sentences describing the natural landmarks>"
+}}
+</settlement_name>
+
+Nothing else.
+"""
+        return self._call_llm(prompt, 0, "name_settlement", max_tokens=256)
+
+    def parse_settlement_name(self, output: "AgentOutput") -> dict:
+        """Extract settlement_name JSON. Returns {} on failure."""
+        match = re.search(r"<settlement_name>(.*?)</settlement_name>", output.content, re.DOTALL)
+        if not match:
+            return {}
+        try:
+            return json.loads(match.group(1).strip())
+        except json.JSONDecodeError:
+            return {}
+
     # ── Output parsers ─────────────────────────────────────────────────────────
 
     def parse_strategy_choice(self, output: AgentOutput) -> dict:
