@@ -652,7 +652,11 @@ class Arbiter:
                 else:
                     unique_opps.append(item)
 
-            print(f"    Attempting {len(unique_opps)} unique category/level combinations:")
+            # Sort by faction goal alignment — highest score first
+            unique_opps.sort(
+                key=lambda o: self._score_coop_option(o, state.factions), reverse=True
+            )
+            print(f"    Attempting {len(unique_opps)} unique category/level combinations (highest alignment first):")
 
             bought_one = False
             for opp in unique_opps:
@@ -661,8 +665,12 @@ class Arbiter:
                 other_option = next(
                     (o for o in CULTURE_TREE[cat]["levels"][lvl]["options"] if o != option), "?"
                 )
+                score = self._score_coop_option(opp, state.factions)
+                other_score = self._score_coop_option(
+                    {"category": cat, "level": lvl, "option": other_option}, state.factions
+                )
                 print(f"\n    Evaluating: {cat} L{lvl} — {option} (costs {cost_str})")
-                print(f"      [Chosen over {other_option} based on faction goal alignment]")
+                print(f"      [Score: {option}={score}, {other_option}={other_score}]")
 
                 # Show per-faction token state
                 for f in state.factions:
@@ -766,37 +774,34 @@ class Arbiter:
                 coop.append({"category": cat, "level": next_lvl, "option": opt, "cost": cost})
         return coop
 
+    def _score_coop_option(self, opt: dict, factions: list[dict]) -> int:
+        """Score a culture option based on faction goal alignment."""
+        option_name = opt["option"].lower()
+        cat = opt["category"]
+        score = 0
+        for f in factions:
+            goals = f.get("goals", {})
+            p = goals.get("primary", {})
+            if p.get("category") == cat and p.get("option", "").lower() == option_name:
+                score += 3
+            elif p.get("enemy_option", "").lower() == option_name:
+                score -= 2
+            for s in goals.get("secondary", []):
+                if s.get("category") == cat and s.get("option", "").lower() == option_name:
+                    score += 2
+                elif s.get("enemy_option", "").lower() == option_name:
+                    score -= 1
+            t = goals.get("tertiary", {})
+            if t.get("category") == cat:
+                score += 1
+        return score
+
     def _pick_preferred_option(self, options: list[dict], factions: list[dict]) -> dict:
         """
         Given two cooperative purchase options for the same category+level,
         pick the one with more faction goal support. Falls back to random on tie.
         """
-        def _score_option(opt: dict) -> int:
-            """Count how many factions have this option in their goals."""
-            option_name = opt["option"].lower()
-            cat = opt["category"]
-            score = 0
-            for f in factions:
-                goals = f.get("goals", {})
-                # Primary
-                p = goals.get("primary", {})
-                if p.get("category") == cat and p.get("option", "").lower() == option_name:
-                    score += 3
-                elif p.get("enemy_option", "").lower() == option_name:
-                    score -= 2
-                # Secondary
-                for s in goals.get("secondary", []):
-                    if s.get("category") == cat and s.get("option", "").lower() == option_name:
-                        score += 2
-                    elif s.get("enemy_option", "").lower() == option_name:
-                        score -= 1
-                # Tertiary (category match — any option helps)
-                t = goals.get("tertiary", {})
-                if t.get("category") == cat:
-                    score += 1
-            return score
-
-        scored = [(opt, _score_option(opt)) for opt in options]
+        scored = [(opt, self._score_coop_option(opt, factions)) for opt in options]
         scored.sort(key=lambda x: x[1], reverse=True)
 
         opt_a, score_a = scored[0]
