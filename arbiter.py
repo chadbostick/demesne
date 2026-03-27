@@ -495,20 +495,52 @@ class Arbiter:
                     print(f"    No cooperative opportunities this era.")
                 break
 
-            # Deduplicate: one attempt per category+level (pick first option)
+            # Show all cooperative opportunities found
+            print(f"\n    Opportunities found: {len(coop)}")
+            for item in coop:
+                cost_str = " + ".join(f"{n} {c}" for c, n in item["cost"].items())
+                print(f"      {item['category']} L{item['level']} — {item['option']} (costs {cost_str})")
+
+            # Show combined token pool
+            combined: dict = {}
+            for f in state.factions:
+                for c, n in f["tokens"].items():
+                    combined[c] = combined.get(c, 0) + n
+            combined_str = ", ".join(f"{c}:{n}" for c, n in combined.items() if n > 0)
+            print(f"    Combined token pool: [{combined_str}]")
+
+            # Deduplicate: one attempt per category+level, pick the option with more faction support
             seen: set = set()
             unique_opps = []
             for item in coop:
                 key = (item["category"], item["level"])
-                if key not in seen:
-                    seen.add(key)
+                if key in seen:
+                    continue
+                seen.add(key)
+                # Find both options for this category+level
+                options_at_level = [i for i in coop if i["category"] == item["category"] and i["level"] == item["level"]]
+                if len(options_at_level) == 2:
+                    best = self._pick_preferred_option(options_at_level, state.factions)
+                    unique_opps.append(best)
+                else:
                     unique_opps.append(item)
+
+            print(f"    Attempting {len(unique_opps)} unique category/level combinations:")
 
             bought_one = False
             for opp in unique_opps:
                 cat, lvl, option, cost = opp["category"], opp["level"], opp["option"], opp["cost"]
                 cost_str = " + ".join(f"{n} {c}" for c, n in cost.items())
+                other_option = next(
+                    (o for o in CULTURE_TREE[cat]["levels"][lvl]["options"] if o != option), "?"
+                )
                 print(f"\n    Evaluating: {cat} L{lvl} — {option} (costs {cost_str})")
+                print(f"      [Chosen over {other_option} based on faction goal alignment]")
+
+                # Show per-faction token state
+                for f in state.factions:
+                    tok_str = ", ".join(f"{c}:{n}" for c, n in f["tokens"].items() if n > 0) or "none"
+                    print(f"      {f['name']}: [{tok_str}]")
 
                 # Try to pool: for each color needed, take from richest faction(s)
                 pool: dict[str, dict[str, int]] = {}
@@ -606,6 +638,50 @@ class Arbiter:
             for opt in CULTURE_TREE[cat]["levels"][next_lvl]["options"]:
                 coop.append({"category": cat, "level": next_lvl, "option": opt, "cost": cost})
         return coop
+
+    def _pick_preferred_option(self, options: list[dict], factions: list[dict]) -> dict:
+        """
+        Given two cooperative purchase options for the same category+level,
+        pick the one with more faction goal support. Falls back to random on tie.
+        """
+        def _score_option(opt: dict) -> int:
+            """Count how many factions have this option in their goals."""
+            option_name = opt["option"].lower()
+            cat = opt["category"]
+            score = 0
+            for f in factions:
+                goals = f.get("goals", {})
+                # Primary
+                p = goals.get("primary", {})
+                if p.get("category") == cat and p.get("option", "").lower() == option_name:
+                    score += 3
+                elif p.get("enemy_option", "").lower() == option_name:
+                    score -= 2
+                # Secondary
+                for s in goals.get("secondary", []):
+                    if s.get("category") == cat and s.get("option", "").lower() == option_name:
+                        score += 2
+                    elif s.get("enemy_option", "").lower() == option_name:
+                        score -= 1
+                # Tertiary (category match — any option helps)
+                t = goals.get("tertiary", {})
+                if t.get("category") == cat:
+                    score += 1
+            return score
+
+        scored = [(opt, _score_option(opt)) for opt in options]
+        scored.sort(key=lambda x: x[1], reverse=True)
+
+        opt_a, score_a = scored[0]
+        opt_b, score_b = scored[1] if len(scored) > 1 else (None, 0)
+
+        print(f"      [Option scoring: {opt_a['option']}={score_a}, {opt_b['option'] if opt_b else '?'}={score_b}]")
+
+        if score_a == score_b:
+            choice = random.choice(options)
+            print(f"      [Tie — randomly chose {choice['option']}]")
+            return choice
+        return opt_a
 
     # ── Challenge Phase ───────────────────────────────────────────────────────
 
