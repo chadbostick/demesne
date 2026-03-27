@@ -513,6 +513,62 @@ Nothing else.
 """
         return self._call_llm(prompt, era, "rename_strategy", max_tokens=128)
 
+    def introduce_faction(
+        self, location: str, terrain: str, neighbor_factions: list[dict]
+    ) -> "AgentOutput":
+        """
+        At game start, the faction introduces itself: names itself and explains
+        why it is settling this land.
+        """
+        neighbors_block = ""
+        if neighbor_factions:
+            lines = ["OTHER FACTIONS SETTLING HERE:"]
+            for nf in neighbor_factions:
+                lines.append(f"  - {nf['ideology']} ({nf['species']})")
+            neighbors_block = "\n".join(lines)
+
+        prompt = f"""\
+You are the leader of a group of {self.faction_data['species']} arriving at a new land to settle.
+
+{self._ideology_block()}
+
+GEOGRAPHY:
+  Location: {location}
+  Terrain: {terrain}
+
+{neighbors_block}
+
+Your people have journeyed here to build something lasting. As their leader, introduce your faction:
+
+1. Choose a name for your organization — something that reflects your species, your ideology, and \
+your ambitions. Not a generic label like "The Guild" — a proper name with character.
+2. Explain in 2-3 sentences why your people are settling this land and what they hope to achieve. \
+Ground it in the geography and your worldview.
+
+Output your introduction in this exact format:
+
+<faction_intro>
+{{
+  "faction_name": "<your organization's name>",
+  "organization_type": "<guild|family|church|warband|company|council|circle|order|tribe|other>",
+  "description": "<2-3 sentences: why you are here, what you hope to build>"
+}}
+</faction_intro>
+
+Nothing else.
+"""
+        return self._call_llm(prompt, 0, "faction_intro", max_tokens=256)
+
+    def parse_faction_intro(self, output: "AgentOutput") -> dict:
+        """Extract faction_intro JSON. Returns {} on failure."""
+        match = re.search(r"<faction_intro>(.*?)</faction_intro>", output.content, re.DOTALL)
+        if not match:
+            return {}
+        try:
+            return json.loads(match.group(1).strip())
+        except json.JSONDecodeError:
+            return {}
+
     def name_settlement(
         self, location: str, terrain: str
     ) -> "AgentOutput":

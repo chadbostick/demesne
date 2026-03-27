@@ -25,7 +25,7 @@ from arbiter import Arbiter
 from mechanics.ideologies import IDEOLOGIES, PROTOTYPE_IDEOLOGIES
 from mechanics.scoring import score_all_factions
 from mechanics.strategies import STRATEGIC_STANCES
-from mechanics.worldbuilding import LOCATIONS, TERRAINS
+from mechanics.worldbuilding import LOCATIONS, TERRAINS, DND5_RACES
 
 
 def _empty_tokens() -> dict:
@@ -38,8 +38,8 @@ def build_faction_data(ideology_name: str, faction_index: int) -> dict:
     return {
         "name": f"{ideology_name} Faction",
         "ideology": ideology_name,
-        "species": "Human",          # placeholder — can be overridden
-        "organization_type": "Guild",  # placeholder
+        "species": "Human",          # overridden by race roll during initiative
+        "organization_type": "Guild",  # overridden by faction introduction
         "tokens": _empty_tokens(),
         "victory_points": 0,
         "goals": {
@@ -132,14 +132,18 @@ def main() -> None:
     print(f"    Location : {location}")
     print(f"    Terrain  : {terrain}")
 
-    # ── Initiative rolls ──────────────────────────────────────────────────────
+    # ── Initiative rolls & species ───────────────────────────────────────────
     print("\n  [INITIATIVE ROLLS]")
     initiative_rolls: dict[str, int] = {}
     for agent in faction_agents:
         fname = agent.faction_data["name"]
         r = roll(20)
         initiative_rolls[fname] = r
-        print(f"    {fname}: rolled {r}")
+        species = random.choice(DND5_RACES)
+        faction = state.get_faction(fname)
+        faction["species"] = species
+        agent.faction_data = faction
+        print(f"    {fname}: rolled {r} — {species}")
 
     initiative_order = sorted(initiative_rolls, key=lambda n: initiative_rolls[n], reverse=True)
     state.set_initiative_order(initiative_order)
@@ -148,10 +152,42 @@ def main() -> None:
         agent.faction_data = state.get_faction(agent.faction_data["name"])
     print(f"\n  Leading faction: {initiative_order[0]}")
     print(f"  Initiative order: {', '.join(initiative_order)}")
+    pause("  ── Initiative set. Press Space/Enter to continue or Esc to quit ──")
+
+    # ── Faction introductions (LLM) ──────────────────────────────────────────
+    print("\n  [FACTION INTRODUCTIONS]")
+    all_faction_data = [state.get_faction(a.faction_data["name"]) for a in faction_agents]
+    for agent in faction_agents:
+        fname = agent.faction_data["name"]
+        neighbors = [f for f in all_faction_data if f["name"] != fname]
+        print(f"\n    → {fname} introducing themselves...", end="", flush=True)
+        intro_output = agent.introduce_faction(location, terrain, neighbors)
+        print(" done.\n")
+        intro = agent.parse_faction_intro(intro_output)
+        if intro:
+            new_name = intro.get("faction_name", fname)
+            org_type = intro.get("organization_type", "Guild")
+            description = intro.get("description", "")
+            # Update faction data in state
+            faction = state.get_faction(fname)
+            faction["name"] = new_name
+            faction["organization_type"] = org_type
+            faction["description"] = description
+            agent.faction_data = faction
+            # Update initiative order with new name
+            initiative_order = [new_name if n == fname else n for n in state.initiative_order]
+            state._data["initiative_order"] = initiative_order
+            if state._data["leading_faction"] == fname:
+                state._data["leading_faction"] = new_name
+            agent.role = f"faction_{new_name.lower().replace(' ', '_')}"
+            print(f"  {new_name} ({agent.faction_data['species']} {org_type})")
+            if description:
+                print(f"    {description}")
+        pause(f"  ── {agent.faction_data['name']} introduced. Press Space/Enter to continue or Esc to quit ──")
 
     # ── Settlement naming (leading faction, LLM) ─────────────────────────────
-    leader_agent = next(a for a in faction_agents if a.faction_data["name"] == initiative_order[0])
-    print(f"\n    → {initiative_order[0]} naming the settlement...", end="", flush=True)
+    leader_agent = next(a for a in faction_agents if a.faction_data["name"] == state.leading_faction)
+    print(f"\n    → {state.leading_faction} naming the settlement...", end="", flush=True)
     naming_output = leader_agent.name_settlement(location, terrain)
     print(" done.\n")
     naming_choice = leader_agent.parse_settlement_name(naming_output)
