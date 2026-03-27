@@ -136,9 +136,11 @@ class Arbiter:
                 stance = "make"
                 color = make_override["exchange_color"]
                 strategy = "make"
+                _make_receive_color = make_override["receive_color"]
                 print(f"    [{fname} overriding to MAKE: {make_override['reason']}]")
             else:
                 strategy, color = self._stance_to_strategy(stance, faction, state)
+                _make_receive_color = None
 
             color_level = state.get_color_level(color)
             cu = state.color_upgrades[color]
@@ -152,7 +154,7 @@ class Arbiter:
                     give = tokens.get(color, 0)  # spend all available tokens of this color
                     receive = make_receive_for_level(color_level, give)
                     if give >= 1:
-                        receive_color = self._pick_make_receive_color(faction, tokens, color, state)
+                        receive_color = _make_receive_color or self._pick_make_receive_color(faction, tokens, color, state)
                         receive_colors = [receive_color] * receive
                         tokens = apply_make_exchange(tokens, color, give, receive, receive_colors)
                         tok_str = ", ".join(f"{c}:{n}" for c, n in tokens.items())
@@ -332,6 +334,7 @@ class Arbiter:
                                 f"shortfall ({reason})"
                             ),
                             "exchange_color": surplus_color,
+                            "receive_color": short_color,
                         }
 
         return None
