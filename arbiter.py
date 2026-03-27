@@ -49,6 +49,9 @@ class Arbiter:
         self._logger = logger
         self._verbose = config.VERBOSE
         self._memory_window = memory_window or config.MEMORY_WINDOW
+        self._era_chronicle: list[str] = []  # short summary per completed era
+        self._era_names: list[str] = []       # era period names used so far
+        self._last_faction_narratives: dict[str, str] = {}  # faction_name → last narrative
 
     def _vprint(self, *args, **kwargs):
         """Print only if verbose mode is on."""
@@ -191,10 +194,9 @@ class Arbiter:
                         make_out = agent.run_make_narrative(
                             era=state.era,
                             make_type=custom_make_name,
-                            exchange_color=color,
-                            receive_color=receive_color,
                             location=state._data.get("location", ""),
                             terrain=state._data.get("terrain", ""),
+                            settlement_stage=state.settlement_stage(),
                             cultures=state.cultures,
                             existing_landmarks=state._data.get("landmarks", []),
                         )
@@ -205,23 +207,28 @@ class Arbiter:
                             s_loc = structure.get("location", "")
                             s_desc = structure.get("description", "")
                             s_purpose = structure.get("purpose", "")
-                            state.add_landmark(s_name, f"{s_desc} {s_purpose}".strip(), fname)
-                            self._logger.log_event("structure_built", era=state.era,
-                                faction=fname, name=s_name, location=s_loc,
-                                description=s_desc, purpose=s_purpose)
-                            print(f"    [{s_name}]")
-                            if s_loc:
-                                print(f"      Location: {s_loc}")
-                            if s_desc:
-                                print(f"      Description: {s_desc}")
-                            if s_purpose:
-                                print(f"      Purpose: {s_purpose}")
                         else:
-                            print(make_out.content)
+                            s_name = custom_make_name
+                            s_loc = ""
+                            s_desc = ""
+                            s_purpose = ""
+
+                        state.add_landmark(s_name, f"{s_desc} {s_purpose}".strip(), fname)
+                        self._logger.log_event("structure_built", era=state.era,
+                            faction=fname, name=s_name, location=s_loc,
+                            description=s_desc, purpose=s_purpose)
+                        print(f"\n  **{self._faction_label(faction)} builds {s_name}**")
+                        if s_loc:
+                            print(f"  {s_loc}")
+                        if s_desc:
+                            print(f"  {s_desc}")
+                        if s_purpose:
+                            print(f"  {s_purpose}")
                         self._logger.log(make_out)
                         outputs.append(make_out.to_dict())
-                        _faction_summaries.append({"name": fname, "activity": f"building ({structure.get('name', custom_make_name) if structure else custom_make_name})", "tokens_earned": 0})
-                        _faction_narratives.append(make_out.content)
+                        narrative_text = f"{s_desc} {s_purpose}".strip() or s_name
+                        _faction_summaries.append({"name": fname, "activity": f"building ({s_name})", "tokens_earned": 0})
+                        _faction_narratives.append(narrative_text)
                         pause(f"  ── {fname} done. Press Space/Enter to continue or Esc to quit ──", era=state.era)
                         continue
                 # Fall through to normal execution if make not possible
@@ -257,7 +264,12 @@ class Arbiter:
                 tokens_after=dict(tokens), influence=faction["influence"])
 
             # Brief in-character narrative (LLM, post-hoc flavor only)
-            narrative_out = agent.run_strategy_narrative(state.era, strategy, tokens_earned, cultures=state.cultures)
+            prev_narr = self._last_faction_narratives.get(fname)
+            narrative_out = agent.run_strategy_narrative(
+                state.era, strategy, tokens_earned, cultures=state.cultures,
+                previous_narrative=prev_narr,
+            )
+            self._last_faction_narratives[fname] = narrative_out.content[:300]
             print(f"\n  **{self._faction_label(faction)}**\n")
             print(f"{narrative_out.content}\n")
             self._logger.log(narrative_out)
@@ -1551,12 +1563,22 @@ class Arbiter:
         self._vprint(f"    → GM writing era summary...", end="", flush=True)
         gm_output = self._gm.narrate_end_of_era(
             {}, state.era, era_outputs_so_far, state.summary(),
-            getattr(self, "_last_challenge_result", {})
+            getattr(self, "_last_challenge_result", {}),
+            previous_era_names=list(self._era_names),
+            previous_chronicles=list(self._era_chronicle),
         )
         print(" done.\n")
         print(gm_output.content)
         self._logger.log(gm_output)
         state.append_era_log(gm_output.content[:500])
+
+        # Store chronicle excerpt and extract era name for future prompts
+        content = gm_output.content.strip()
+        self._era_chronicle.append(content[:300])
+        # Try to extract the era name from the first line/title
+        first_line = content.split("\n")[0].strip().strip("#").strip()
+        if first_line:
+            self._era_names.append(first_line)
 
         # Reconsideration trigger: leader changed during this era
         leader_before = getattr(self, "_leader_before_challenge", None)

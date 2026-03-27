@@ -178,6 +178,8 @@ VOICE CONSTRAINT: Write as a historian and cartographer. No game mechanics, toke
         era_outputs: list[dict],
         state_summary: str,
         challenge_result: dict,
+        previous_era_names: list[str] | None = None,
+        previous_chronicles: list[str] | None = None,
     ) -> AgentOutput:
         # Extract only in-character narrative text from era outputs (skip mechanical logs)
         narrative_lines = []
@@ -199,13 +201,28 @@ VOICE CONSTRAINT: Write as a historian and cartographer. No game mechanics, toke
                 f"Leadership has shifted to {challenge_result.get('new_leader', 'another faction')}."
             )
 
+        # Build previous context
+        prev_block = ""
+        if previous_chronicles:
+            prev_lines = []
+            for i, chron in enumerate(previous_chronicles):
+                name = previous_era_names[i] if previous_era_names and i < len(previous_era_names) else f"Generation {i+1}"
+                prev_lines.append(f"  Gen {i+1} ({name}): {chron[:150]}...")
+            prev_block = "PREVIOUS GENERATIONS (do NOT repeat these themes or titles):\n" + "\n".join(prev_lines)
+
+        era_names_block = ""
+        if previous_era_names:
+            era_names_block = f"\nPERIOD NAMES ALREADY USED (choose a NEW, DIFFERENT name):\n  {', '.join(previous_era_names)}\n"
+
         prompt = f"""\
 You are the chronicler of a fantasy settlement. You record history as it unfolds.
 
-SETTLEMENT STATE AT END OF ERA {round_num}:
+SETTLEMENT STATE AT END OF GENERATION {round_num}:
 {state_summary}
 
-WHAT THE FACTIONS SAID AND DID THIS ERA:
+{prev_block}
+{era_names_block}
+WHAT THE FACTIONS SAID AND DID THIS GENERATION:
 {era_narrative}
 
 CHALLENGE OUTCOME:
@@ -216,9 +233,8 @@ Describe what changed permanently: which communities rose, which declined, what 
 of this generation will inherit that their parents did not have. How did the landscape change? \
 What new traditions, scars, or institutions now define this place?
 
-Mark the passage of time. Name the period if it deserves one ("The Quiet Years," "The Age of \
-the Broken Channel"). Give the reader a sense that decades have elapsed and a new generation \
-is about to take the stage.
+Mark the passage of time. Name this period something NEW and DIFFERENT from previous periods. \
+Give the reader a sense that decades have elapsed and a new generation is about to take the stage.
 
 VOICE CONSTRAINT: Write as a historian closing a chapter. No tokens, rolls, victory points, \
 strategies, or game mechanics. No words like "faction," "phase," "era," "points," or "unlocked." \

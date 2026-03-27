@@ -339,7 +339,8 @@ Only include colors where you are donating > 0 tokens. You may donate 0 total if
         culture_section = f"\n{culture_block}\n" if culture_block else ""
 
         prompt = f"""\
-You are {self.faction_data['name']}, leading the settlement through a crisis.
+You are the chronicler for {self.faction_data['name']}, a {self.faction_data['organization_type']} of {self.faction_data['species']}, \
+currently leading the settlement through a crisis.
 
 {self._ideology_block()}
 {culture_section}
@@ -347,11 +348,12 @@ THE CRISIS OF THIS GENERATION:
 {challenge_text}
 
 This is not a single battle or a brief storm — this is the defining crisis of an entire \
-generation. It will be remembered for centuries. As the leader, describe what your people will \
-commit to face this. What will be sacrificed? What institutions mobilized? What will the elders \
-tell the children about this moment?
+generation. It will be remembered for centuries. Describe what {self.faction_data['name']} \
+will commit to face this. What will be sacrificed? What institutions mobilized? What will \
+the elders tell the children about this moment?
 
-Speak as a leader who knows the stakes are generational. 2-3 sentences.
+Write in THIRD PERSON — refer to {self.faction_data['name']} by name or as "they", never \
+"we" or "our". 2-3 sentences.
 
 VOICE CONSTRAINT: No tokens, dice, victory points, or game mechanics.
 """
@@ -416,10 +418,9 @@ voice and worldview. 2-3 sentences only.
         self,
         era: int,
         make_type: str,
-        exchange_color: str,
-        receive_color: str,
         location: str,
         terrain: str,
+        settlement_stage: str,
         cultures: dict | None = None,
         existing_landmarks: list[dict] | None = None,
     ) -> "AgentOutput":
@@ -437,6 +438,34 @@ voice and worldview. 2-3 sentences only.
                 lines.append(f"  - {lm['name']}: {lm.get('description', '')}")
             landmarks_block = "\n".join(lines) + "\n"
 
+        # Scale structure complexity to settlement stage
+        if "city-state" in settlement_stage:
+            scale_guidance = (
+                "This is a WORLD-CLASS structure in a major city-state. Think grand architecture, "
+                "advanced engineering, monumental scale. The best materials, the finest craft, "
+                "institutional power made physical. Something that would be famous across nations."
+            )
+        elif "town" in settlement_stage:
+            scale_guidance = (
+                "This is a substantial structure in a growing town. Professional craft, durable "
+                "materials, civic ambition. Larger than anything a village could build, with "
+                "purpose-built rooms and organized labor behind it."
+            )
+        elif "village" in settlement_stage:
+            scale_guidance = (
+                "This is a village-scale structure. Local materials, community-built, functional "
+                "but with emerging craft traditions. It has character and permanence but remains "
+                "modest in scale."
+            )
+        else:
+            scale_guidance = (
+                "This is a SIMPLE, PRIMITIVE structure built by scattered camps of survivors. "
+                "Think rough shelters, cleared ground, cairns, lean-tos, drying racks, fire pits, "
+                "basic fencing. Use only materials found in the immediate landscape. No grand "
+                "architecture, no advanced engineering, no monumental anything. These people are "
+                "still learning to survive here."
+            )
+
         prompt = f"""\
 You are {self.faction_data['name']}, a {self.faction_data['organization_type']} of {self.faction_data['species']}.
 
@@ -445,13 +474,16 @@ You are {self.faction_data['name']}, a {self.faction_data['organization_type']} 
 SETTLEMENT GEOGRAPHY:
   Location: {location}
   Terrain: {terrain}
+  Current stage: {settlement_stage}
 
 {landmarks_block}
-Your people are building a {make_type} — a structure that will stand for generations. This is a \
-place where your community converts {exchange_color} effort into {receive_color} resources.
+Your people are building something that will stand for generations.
 
-Describe this structure. It should reflect your people's species, ideology, and history in this \
-settlement. Consider the geography and what already exists here.
+SCALE GUIDANCE:
+{scale_guidance}
+
+Describe this structure. It should reflect your people's species, ideology, and the current \
+level of development. Consider the geography and what already exists here.
 
 Output in this exact format:
 
@@ -463,6 +495,9 @@ Output in this exact format:
   "purpose": "<what it does for the community — 1 sentence>"
 }}
 </make_structure>
+
+VOICE CONSTRAINT: Do NOT mention token colors (red, blue, green, orange, pink), game mechanics, \
+victory points, or any metagame concepts. Describe a real place in a real world.
 
 Nothing else.
 """
@@ -485,6 +520,7 @@ Nothing else.
         tokens_earned: int,
         make_info: dict | None = None,
         cultures: dict | None = None,
+        previous_narrative: str | None = None,
     ) -> "AgentOutput":
         """
         Brief in-character narration of what the faction did this era.
@@ -520,11 +556,18 @@ Nothing else.
         culture_block = self._cultural_identity_block(cultures) if cultures else ""
         culture_section = f"\n{culture_block}\n" if culture_block else ""
 
+        prev_block = ""
+        if previous_narrative:
+            prev_block = (
+                f"\nLAST GENERATION YOU WROTE (do NOT repeat this — advance the story):\n"
+                f"  {previous_narrative[:200]}...\n"
+            )
+
         prompt = f"""\
 You are the chronicler for {self.faction_data['name']}, a {self.faction_data['organization_type']} of {self.faction_data['species']}.
 
 {self._ideology_block()}
-{culture_section}
+{culture_section}{prev_block}
 DURING THIS GENERATION:
 {activity_line}
 {result_line}
