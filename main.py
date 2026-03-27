@@ -57,7 +57,77 @@ def build_faction_data(ideology_name: str, faction_index: int) -> dict:
     }
 
 
-def write_final_summary(output_dir: str, state: SettlementState, all_actions: list[dict], all_events: list[dict]) -> None:
+def _build_game_chronicle(state: SettlementState, all_events: list[dict], max_era: int) -> dict:
+    """Build a comprehensive game chronicle organized by era."""
+    state_data = state.to_dict()
+
+    # Organize events by era
+    eras: dict[int, list[dict]] = {}
+    for e in all_events:
+        era = e.get("era", 0)
+        eras.setdefault(era, []).append(e)
+
+    era_summaries = []
+    for era_num in range(0, max_era + 1):
+        era_events = eras.get(era_num, [])
+        era_entry: dict = {"era": era_num, "events": era_events}
+
+        if era_num == 0:
+            era_entry["label"] = "Pre-Game Setup"
+        else:
+            era_entry["label"] = f"Generation {era_num}"
+
+        # Extract key data per era
+        era_entry["challenges"] = [e for e in era_events if e["event_type"] == "challenge_drawn"]
+        era_entry["challenge_results"] = [e for e in era_events if e["event_type"] == "challenge_resolved"]
+        era_entry["culture_purchases"] = [e for e in era_events if e["event_type"] == "culture_purchase"]
+        era_entry["places_founded"] = [e for e in era_events if e["event_type"] == "place_founded"]
+        era_entry["structures_built"] = [e for e in era_events if e["event_type"] == "structure_built"]
+        era_entry["boons"] = [e for e in era_events if e["event_type"] == "boon_awarded"]
+        era_entry["leadership_shifts"] = [e for e in era_events if e["event_type"] == "leadership_shift"]
+        era_entry["eliminations"] = [e for e in era_events if e["event_type"] == "faction_eliminated"]
+        era_entry["vp_updates"] = [e for e in era_events if e["event_type"] == "vp_update"]
+
+        era_summaries.append(era_entry)
+
+    chronicle = {
+        "settlement": {
+            "name": state_data["name"],
+            "location": state_data.get("location"),
+            "terrain": state_data.get("terrain"),
+            "landmark_description": state_data.get("landmark_description"),
+            "stage": state.settlement_stage(),
+            "total_eras": max_era,
+            "winner": state_data.get("winner"),
+            "game_over": state_data.get("game_over", False),
+        },
+        "factions": [
+            {
+                "name": f["name"],
+                "ideology": f["ideology"],
+                "species": f["species"],
+                "organization_type": f["organization_type"],
+                "description": f.get("description", ""),
+                "influence": f.get("influence", 0),
+                "victory_points": f["victory_points"],
+                "tokens": f["tokens"],
+                "goals": f["goals"],
+            }
+            for f in state_data["factions"]
+        ],
+        "eliminated_factions": [
+            e for e in all_events if e["event_type"] == "faction_eliminated"
+        ],
+        "cultures": state_data["cultures"],
+        "places": state_data.get("places", []),
+        "landmarks": state_data.get("landmarks", []),
+        "boons": state_data.get("boons", []),
+        "eras": era_summaries,
+    }
+    return chronicle
+
+
+def write_final_summary(output_dir: str, state: SettlementState, all_actions: list[dict], all_events: list[dict], max_era: int) -> None:
     final_state_path = os.path.join(output_dir, "final_state.json")
     with open(final_state_path, "w", encoding="utf-8") as f:
         json.dump({"state": state.to_dict(), "events": all_events}, f, indent=2)
@@ -71,7 +141,7 @@ def write_final_summary(output_dir: str, state: SettlementState, all_actions: li
             era = action.get("round", 0)
             if era != current_era:
                 current_era = era
-                f.write(f"\n{'='*60}\nERA {current_era}\n{'='*60}\n\n")
+                f.write(f"\n{'='*60}\nGeneration {current_era}\n{'='*60}\n\n")
             f.write(f"[{action['phase'].upper()} / {action['agent_role'].upper()}]\n")
             f.write(action["content"].strip())
             f.write("\n\n" + "-" * 40 + "\n\n")
@@ -79,8 +149,22 @@ def write_final_summary(output_dir: str, state: SettlementState, all_actions: li
         f.write("\n\nFINAL STATE\n" + "=" * 60 + "\n")
         f.write(state.to_json())
 
-    print(f"\nFinal state:       {final_state_path}")
-    print(f"Narrative summary: {narrative_path}")
+    # Comprehensive chronicle
+    chronicle = _build_game_chronicle(state, all_events, max_era)
+    chronicle_path = os.path.join(output_dir, "game_chronicle.json")
+    with open(chronicle_path, "w", encoding="utf-8") as f:
+        json.dump(chronicle, f, indent=2)
+
+    _vprint(f"\nFinal state:       {final_state_path}")
+    _vprint(f"Narrative summary: {narrative_path}")
+    print(f"\nGame chronicle:    {chronicle_path}")
+
+    # Print chronicle to console in verbose mode
+    if config.VERBOSE:
+        print(f"\n{'='*60}")
+        print("COMPREHENSIVE GAME CHRONICLE")
+        print(f"{'='*60}\n")
+        print(json.dumps(chronicle, indent=2))
 
 
 def main() -> None:
@@ -242,7 +326,7 @@ def main() -> None:
     )
 
     final_state = arbiter.run(state, max_eras=args.eras, output_dir=args.output_dir)
-    write_final_summary(args.output_dir, final_state, logger.all_actions, logger.all_events)
+    write_final_summary(args.output_dir, final_state, logger.all_actions, logger.all_events, final_state.era)
 
     # Print final scores
     print("\nFinal Victory Points:")
