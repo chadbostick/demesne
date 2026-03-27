@@ -39,6 +39,50 @@ ideology, not as "factions." No metagaming language of any kind.
 """
         return self._call_llm(prompt, round_num, "challenge_narration")
 
+    def narrate_challenge_outcome(
+        self,
+        round_num: int,
+        challenge_text: str,
+        leader_plan: str,
+        donation_summary: str,
+        result: dict,
+        state_summary: str,
+    ) -> AgentOutput:
+        success = result.get("success", False)
+        outcome_word = "prevailed" if success else "failed"
+        if success:
+            boon_line = f"A boon was earned: {result.get('boon', '')}"
+        else:
+            new_leader = result.get("new_leader", "another group")
+            boon_line = f"The settlement suffered setback. Leadership has passed to {new_leader}."
+
+        prompt = f"""\
+You are the chronicler of a fantasy settlement. You record history as it unfolds.
+
+SETTLEMENT STATE:
+{state_summary}
+
+THE CRISIS:
+{challenge_text}
+
+THE LEADER'S PLAN:
+{leader_plan}
+
+HOW THE SETTLEMENT RESPONDED:
+{donation_summary}
+
+OUTCOME: The settlement {outcome_word}.
+{boon_line}
+
+Write 2-3 sentences describing what actually happened. Did the plan work? What went wrong or \
+right? How did the people respond? Write in past tense, third-person omniscient.
+
+VOICE CONSTRAINT: Write as a historian recording real events. Do NOT mention tokens, rolls, \
+victory points, difficulty, or any game mechanics. No metagaming language. Ground every \
+observation in the lived reality of the settlers.
+"""
+        return self._call_llm(prompt, round_num, "challenge_outcome", max_tokens=256)
+
     def narrate_end_of_era(
         self,
         context: dict,

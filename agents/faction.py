@@ -298,6 +298,33 @@ Only include colors where you are donating > 0 tokens. You may donate 0 total if
 """
         return self._call_llm(prompt, round_num, "challenge")
 
+    def run_challenge_plan(
+        self,
+        era: int,
+        challenge_text: str,
+        cultures: dict | None = None,
+    ) -> "AgentOutput":
+        """Leader narrates what they plan to do about the challenge, before the roll."""
+        culture_block = self._cultural_identity_block(cultures) if cultures else ""
+        culture_section = f"\n{culture_block}\n" if culture_block else ""
+
+        prompt = f"""\
+You are {self.faction_data['name']}, leading the settlement through a crisis.
+
+{self._ideology_block()}
+{culture_section}
+THE CRISIS:
+{challenge_text}
+
+As the leader, describe what your people will do to face this challenge. What resources will you \
+commit? What strategy will you employ? Speak as a leader rallying their people before the outcome \
+is known.
+
+VOICE CONSTRAINT: Write as an in-character settler leader. Do NOT mention tokens, dice rolls, \
+victory points, difficulty numbers, or any game mechanics. 2-3 sentences only.
+"""
+        return self._call_llm(prompt, era, "challenge_plan", max_tokens=256)
+
     def run_challenge_narrative(
         self,
         context: dict,

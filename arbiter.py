@@ -1006,6 +1006,19 @@ class Arbiter:
         leader_vp = leader_faction["victory_points"]
         leader_vp_bonus = leader_vp // 10
 
+        # ── Leader narrates their plan (before the roll) ──────────────────────
+        leader_plan_text = ""
+        if leader_agent:
+            print(f"\n    → {leading_name} declaring their plan...", end="", flush=True)
+            plan_output = leader_agent.run_challenge_plan(
+                state.era, challenge_text, cultures=state.cultures
+            )
+            print(" done.\n")
+            leader_plan_text = plan_output.content
+            print(leader_plan_text)
+            self._logger.log(plan_output)
+            outputs.append(plan_output.to_dict())
+
         # ── Step 1: Leader donates (no LLM) ──────────────────────────────────
         needed = max(0, difficulty - 10 - leader_vp_bonus)
         leader_tokens = dict(leader_faction["tokens"])
@@ -1163,23 +1176,21 @@ class Arbiter:
         state.advance_difficulty(failed=not success)
         print(f"    [Next difficulty: {state.challenge_difficulty}]")
 
-        # ── Step 4: Leader narrative (one LLM call) ───────────────────────────
-        if leader_agent:
-            donation_summary = "; ".join(donation_parts)
-            print(f"\n    → {leading_name} narrating challenge...", end="", flush=True)
-            narrative_output = leader_agent.run_challenge_narrative(
-                context={},
-                era=state.era,
-                challenge_text=challenge_text,
-                donation_summary=donation_summary,
-                difficulty=difficulty,
-                result=challenge_result,
-                cultures=state.cultures,
-            )
-            print(" done.\n")
-            print(narrative_output.content)
-            self._logger.log(narrative_output)
-            outputs.append(narrative_output.to_dict())
+        # ── Step 4: GM narrates the outcome ──────────────────────────────────
+        donation_summary = "; ".join(donation_parts)
+        print(f"\n    → GM chronicling the outcome...", end="", flush=True)
+        outcome_output = self._gm.narrate_challenge_outcome(
+            round_num=state.era,
+            challenge_text=challenge_text,
+            leader_plan=leader_plan_text,
+            donation_summary=donation_summary,
+            result=challenge_result,
+            state_summary=state.summary(),
+        )
+        print(" done.\n")
+        print(outcome_output.content)
+        self._logger.log(outcome_output)
+        outputs.append(outcome_output.to_dict())
 
         pause("  ── Challenge resolved. Press Space/Enter to continue or Esc to quit ──", era=state.era)
         self._last_challenge_result = challenge_result
