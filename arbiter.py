@@ -174,10 +174,17 @@ class Arbiter:
                         )
                         self._vprint(f"      [Tokens now: {tok_str}]")
                         state.update_faction_tokens(fname, tokens)
+
+                        # Influence gain: net tokens earned if 2x+ return
+                        if receive >= give * 2:
+                            make_influence = receive - give
+                            faction["influence"] = faction.get("influence", 0) + make_influence
+                            self._vprint(f"      [Influence: {faction['influence']} (+{make_influence} from make)]")
+
                         self._logger.log_event("make_exchange", era=state.era,
                             faction=fname, give_color=color, give_amount=give,
                             receive_color=receive_color, receive_amount=receive,
-                            tokens_after=dict(tokens))
+                            tokens_after=dict(tokens), influence=faction.get("influence", 0))
 
                         # LLM describes the structure
                         self._vprint(f"    → {fname} describing their construction...", end="", flush=True)
@@ -238,12 +245,16 @@ class Arbiter:
             tok_str = ", ".join(f"{c}:{n}" for c, n in tokens.items())
             self._vprint(f"      [Tokens now: {tok_str}]")
             state.update_faction_tokens(fname, tokens)
+            # Add net tokens earned to influence
+            faction["influence"] = faction.get("influence", 0) + tokens_earned
+            self._vprint(f"      [Influence: {faction['influence']} (+{tokens_earned})]")
+
             self._logger.log_event("strategy_roll", era=state.era,
                 faction=fname, stance=stance, strategy=custom_strategy_name,
                 color=color, rolls=all_rolls, base_earned=base_count,
                 bonus_earned=bonus_count,
                 bonus_colors=bonus_colors if bonus_count > 0 else [],
-                tokens_after=dict(tokens))
+                tokens_after=dict(tokens), influence=faction["influence"])
 
             # Brief in-character narrative (LLM, post-hoc flavor only)
             narrative_out = agent.run_strategy_narrative(state.era, strategy, tokens_earned, cultures=state.cultures)
@@ -1345,32 +1356,81 @@ class Arbiter:
             total=total, difficulty=difficulty, success=success,
             donations=donation_parts)
 
+        # Track which factions contributed tokens
+        contributing_factions = set()
+        for part in donation_parts:
+            for f in state.factions:
+                if f["name"] in part and ": 0" not in part:
+                    contributing_factions.add(f["name"])
+
         if success:
             boons = self._roll_boons()
             for boon in boons:
                 state.add_boon(boon)
             boon_str = " + ".join(boons)
             print(f"    [Boon: {boon_str}]")
+
+            # Influence: leader +1d10, contributing factions each +1d6
+            leader_inf_roll = roll(10)
+            leader_faction["influence"] = leader_faction.get("influence", 0) + leader_inf_roll
+            self._vprint(f"    [Influence: {leading_name} +{leader_inf_roll} (d10) → {leader_faction['influence']}]")
+            for fname in contributing_factions:
+                if fname == leading_name:
+                    continue
+                contrib_roll = roll(6)
+                f = state.get_faction(fname)
+                f["influence"] = f.get("influence", 0) + contrib_roll
+                self._vprint(f"    [Influence: {fname} +{contrib_roll} (d6) → {f['influence']}]")
+
             challenge_result = {"success": True, "roll": d20, "total": total, "boons": boons}
         else:
-            # Re-roll initiative for all factions
-            self._vprint(f"\n    [INITIATIVE RE-ROLL]")
-            new_initiative: dict[str, int] = {}
+            # Influence shift: leader subtracts d20, others add d20
+            self._vprint(f"\n    [INFLUENCE SHIFT — LEADERSHIP CRISIS]")
+            leader_loss = roll(20)
+            leader_faction["influence"] = leader_faction.get("influence", 0) - leader_loss
+            self._vprint(f"    [Influence: {leading_name} -{leader_loss} → {leader_faction['influence']}]")
+
             for agent in self._factions:
                 fname = agent.faction_data["name"]
-                r = roll(20)
-                new_initiative[fname] = r
-                self._vprint(f"      {fname}: rolled {r}")
-            new_order = sorted(new_initiative, key=lambda n: new_initiative[n], reverse=True)
-            state.set_initiative_order(new_order)
-            # Re-sync faction_data references
-            for agent in self._factions:
-                agent.faction_data = state.get_faction(agent.faction_data["name"])
-            new_leader = new_order[0]
-            self._vprint(f"    [New leading faction: {new_leader}]")
-            self._vprint(f"    [New initiative order: {', '.join(new_order)}]")
-            self._logger.log_event("initiative_reroll", era=state.era,
-                rolls=new_initiative, order=new_order, new_leader=new_leader)
+                if fname == leading_name:
+                    continue
+                gain = roll(20)
+                f = state.get_faction(fname)
+                f["influence"] = f.get("influence", 0) + gain
+                self._vprint(f"    [Influence: {fname} +{gain} → {f['influence']}]")
+
+            # Check for faction elimination (influence < 0)
+            eliminated = [f["name"] for f in state.factions if f.get("influence", 0) < 0]
+            for elim_name in eliminated:
+                print(f"\n    *** {elim_name} has been scattered — their influence has collapsed ***")
+                state.eliminate_faction(elim_name)
+                self._factions = [a for a in self._factions if a.faction_data["name"] != elim_name]
+                self._logger.log_event("faction_eliminated", era=state.era, faction=elim_name)
+
+            # New leader = highest influence
+            if state.factions:
+                new_leader_f = max(state.factions, key=lambda f: f.get("influence", 0))
+                new_leader = new_leader_f["name"]
+                state.set_leading_faction(new_leader)
+                # Re-sort initiative order by influence
+                new_order = sorted(
+                    [f["name"] for f in state.factions],
+                    key=lambda n: state.get_faction(n).get("influence", 0),
+                    reverse=True,
+                )
+                state._data["initiative_order"] = new_order
+                # Re-sync
+                for agent in self._factions:
+                    agent.faction_data = state.get_faction(agent.faction_data["name"])
+                self._vprint(f"    [New leader: {new_leader} (influence {new_leader_f['influence']})]")
+                inf_display = ", ".join(f"{n}({state.get_faction(n)['influence']})" for n in new_order)
+                self._vprint(f"    [Influence order: {inf_display}]")
+                self._logger.log_event("leadership_shift", era=state.era,
+                    new_leader=new_leader, influence_order={n: state.get_faction(n)["influence"] for n in new_order},
+                    eliminated=eliminated)
+            else:
+                new_leader = "none"
+
             challenge_result = {"success": False, "roll": d20, "total": total, "new_leader": new_leader}
 
         state.advance_difficulty(failed=not success)

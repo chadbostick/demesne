@@ -53,6 +53,7 @@ def build_faction_data(ideology_name: str, faction_index: int) -> dict:
         },
         "needs_reconsideration": False,
         "culture_preferences": id_.get("culture_preferences", {}),
+        "influence": 0,
     }
 
 
@@ -165,8 +166,12 @@ def main() -> None:
 
     initiative_order = sorted(initiative_rolls, key=lambda n: initiative_rolls[n], reverse=True)
     state.set_initiative_order(initiative_order)
+    # Set initial influence from initiative rolls
     for agent in faction_agents:
-        agent.faction_data = state.get_faction(agent.faction_data["name"])
+        fname = agent.faction_data["name"]
+        faction = state.get_faction(fname)
+        faction["influence"] = initiative_rolls[fname]
+        agent.faction_data = faction
     _vprint(f"\n  Leading faction: {initiative_order[0]}")
     _vprint(f"  Initiative order: {', '.join(initiative_order)}")
     logger.log_event("initiative", era=0, rolls=initiative_rolls, order=initiative_order, leader=initiative_order[0])

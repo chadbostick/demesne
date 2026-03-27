@@ -70,6 +70,18 @@ class SettlementState:
     def update_faction_vp(self, name: str, vp: int) -> None:
         self.get_faction(name)["victory_points"] = vp
 
+    def eliminate_faction(self, name: str) -> None:
+        """Remove a faction from the game (influence dropped below 0)."""
+        self._data["factions"] = [f for f in self._data["factions"] if f["name"] != name]
+        self._data["initiative_order"] = [n for n in self._data["initiative_order"] if n != name]
+        if self._data["leading_faction"] == name:
+            # Transfer leadership to highest influence remaining
+            if self._data["factions"]:
+                best = max(self._data["factions"], key=lambda f: f.get("influence", 0))
+                self._data["leading_faction"] = best["name"]
+            else:
+                self._data["leading_faction"] = None
+
     def set_leading_faction(self, name: str) -> None:
         self._data["leading_faction"] = name
 
@@ -221,7 +233,8 @@ class SettlementState:
         lines = [f"Leading faction: {self._data['leading_faction']}"]
         for f in self._data["factions"]:
             tok = ", ".join(f"{c}:{n}" for c, n in f["tokens"].items() if n > 0) or "none"
-            lines.append(f"  {f['name']} ({f['ideology']}) — VP:{f['victory_points']} tokens:[{tok}]")
+            inf = f.get("influence", 0)
+            lines.append(f"  {f['name']} ({f['ideology']}) — VP:{f['victory_points']} influence:{inf} tokens:[{tok}]")
         return "\n".join(lines)
 
     def summary(self) -> str:
