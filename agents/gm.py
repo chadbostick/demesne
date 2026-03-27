@@ -123,7 +123,7 @@ transformed not just the settlement's condition, but its character.
 VOICE CONSTRAINT: Write as a historian looking back across decades. No tokens, rolls, \
 victory points, or game mechanics.
 """
-        return self._call_llm(prompt, round_num, "challenge_outcome", max_tokens=256)
+        return self._call_llm(prompt, round_num, "challenge_outcome", max_tokens=512)
 
     def narrate_boon(
         self,
@@ -264,18 +264,16 @@ CHALLENGE OUTCOME:
 
 A generation has passed. Write TWO sections:
 
-SECTION 1 — THE CHRONICLE (4-6 sentences):
-Close this historical period. Describe what changed permanently: which communities rose, \
-which declined, what the children of this generation will inherit. Name this period something \
-NEW and DIFFERENT from previous periods. Reference any named historical figures from this era.
+First, close this historical period in 4-6 sentences. Describe what changed permanently: which \
+communities rose, which declined, what the children of this generation will inherit. Name this \
+period something NEW and DIFFERENT from previous periods. Reference any named historical figures.
 
-SECTION 2 — A TRAVELER ARRIVES (3-4 sentences):
-Describe what a traveler would experience arriving at the settlement RIGHT NOW. What do they \
-see first? What sounds and smells reach them? What food is offered? What do the people look \
-like, wear, do? What buildings or structures dominate the skyline? What goods are being \
-traded in the market (if one exists)? Make it vivid, sensory, and specific to the current \
-stage of development. If it's scattered camps, it should feel like frontier survival. If \
-it's a city-state, it should feel like arriving at a capital.
+Then, seamlessly transition to describing the settlement as it stands now — what a traveler \
+would experience arriving at this moment. In 3-4 sentences: what do they see first? What sounds \
+and smells reach them? What food is offered? What do the people wear, build, trade? Make it \
+vivid, sensory, and specific to the current stage of development. If it's scattered camps, \
+it should feel like frontier survival. If it's a city-state, it should feel like arriving \
+at a capital. Do NOT use section labels or headers — let it flow naturally from the chronicle.
 
 VOICE CONSTRAINT: Write as a historian closing a chapter. No tokens, rolls, victory points, \
 strategies, or game mechanics. No words like "faction," "phase," "era," "points," or "unlocked." \
@@ -307,7 +305,7 @@ VOICE CONSTRAINT: Write as a witness to living history, not a game commentator. 
 tokens, victory points, unlocks, purchases, upgrades, levels, or any game mechanics. \
 No faction labels. No metagaming language. Describe the lived reality of this change.
 """
-        return self._call_llm(prompt, round_num, "culture_purchase", max_tokens=256)
+        return self._call_llm(prompt, round_num, "culture_purchase", max_tokens=512)
 
     def narrate_strategy_phase(
         self,
@@ -352,7 +350,7 @@ should feel that prosperity and crisis are two sides of the same coin.
 VOICE CONSTRAINT: Write as a historian. No tokens, rolls, victory points, strategies, or game \
 mechanics. Ground every observation in the lived reality of generations.
 """
-        return self._call_llm(prompt, round_num, "strategy_summary", max_tokens=256)
+        return self._call_llm(prompt, round_num, "strategy_summary", max_tokens=512)
 
     def _call_llm(self, prompt: str, round_num: int, phase: str, max_tokens: int = 1024) -> AgentOutput:
         import anthropic

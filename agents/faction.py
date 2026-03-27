@@ -357,7 +357,7 @@ Write in THIRD PERSON — refer to {self.faction_data['name']} by name or as "th
 
 VOICE CONSTRAINT: No tokens, dice, victory points, or game mechanics.
 """
-        return self._call_llm(prompt, era, "challenge_plan", max_tokens=256)
+        return self._call_llm(prompt, era, "challenge_plan", max_tokens=512)
 
     def run_challenge_narrative(
         self,
@@ -581,7 +581,7 @@ as "they", never "we" or "our".
 VOICE CONSTRAINT: No token colors, no rolls, no victory points, no game mechanics. \
 Write as history, not a turn report.
 """
-        return self._call_llm(prompt, era, "strategy_narrative", max_tokens=256)
+        return self._call_llm(prompt, era, "strategy_narrative", max_tokens=512)
 
     def name_historical_figure(
         self, era: int, event_type: str, event_description: str,

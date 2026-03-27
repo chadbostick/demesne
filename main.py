@@ -134,18 +134,35 @@ def write_final_summary(output_dir: str, state: SettlementState, all_actions: li
     with open(final_state_path, "w", encoding="utf-8") as f:
         json.dump({"state": state.to_dict(), "events": all_events}, f, indent=2)
 
+    # Phases to exclude from narrative (mechanical, not story)
+    _MECHANICAL_PHASES = {"strategy", "investment", "rename_strategy", "historical_figure"}
+
+    def _clean_narrative(text: str) -> str:
+        """Strip XML tags and JSON blocks from LLM output for narrative file."""
+        import re as _re
+        # Remove XML-tagged JSON blocks
+        text = _re.sub(r"<\w+>\s*\{[^}]*\}\s*</\w+>", "", text, flags=_re.DOTALL)
+        # Remove any remaining XML tags
+        text = _re.sub(r"</?[\w_]+>", "", text)
+        return text.strip()
+
     narrative_path = os.path.join(output_dir, "narrative_summary.txt")
     with open(narrative_path, "w", encoding="utf-8") as f:
         f.write(f"DEMESNE SIMULATION — {state._data['name']}\n")
         f.write("=" * 60 + "\n\n")
         current_era = 0
         for action in all_actions:
+            phase = action.get("phase", "")
+            if phase in _MECHANICAL_PHASES:
+                continue
             era = action.get("round", 0)
             if era != current_era:
                 current_era = era
                 f.write(f"\n{'='*60}\nGeneration {current_era}\n{'='*60}\n\n")
-            f.write(f"[{action['phase'].upper()} / {action['agent_role'].upper()}]\n")
-            f.write(action["content"].strip())
+            content = _clean_narrative(action["content"])
+            if not content:
+                continue
+            f.write(content)
             f.write("\n\n" + "-" * 40 + "\n\n")
 
         f.write("\n\nFINAL STATE\n" + "=" * 60 + "\n")
