@@ -246,6 +246,36 @@ def main() -> None:
     _vprint(f"    Terrain  : {terrain}")
     logger.log_event("geography", era=0, location=location, terrain=terrain)
 
+    # Seed economy based on geography
+    _TERRAIN_PRODUCTION = {
+        "Mountains": ["stone", "ore", "mountain herbs"],
+        "Forest": ["timber", "game", "wild herbs", "mushrooms"],
+        "Plains": ["grain", "livestock", "hay"],
+        "Desert": ["salt", "gemstones", "cactus fiber"],
+        "Tundra": ["furs", "bone", "seal oil"],
+        "Hills": ["clay", "sheep", "root vegetables"],
+        "Valley": ["fruit", "grain", "freshwater fish"],
+        "Plateau": ["wind-dried meat", "hardy grains", "stone"],
+        "Swamp": ["peat", "reeds", "swamp herbs", "fish"],
+        "Marsh": ["waterfowl", "rushes", "shellfish", "bog iron"],
+    }
+    _TERRAIN_SCARCITY = {
+        "Mountains": ["grain", "timber"],
+        "Forest": ["stone", "open grazing land"],
+        "Plains": ["timber", "stone", "metal ore"],
+        "Desert": ["water", "timber", "grain"],
+        "Tundra": ["grain", "timber", "fresh vegetables"],
+        "Hills": ["timber", "fish"],
+        "Valley": ["stone", "metal ore"],
+        "Plateau": ["water", "timber"],
+        "Swamp": ["stone", "dry land", "grain"],
+        "Marsh": ["stone", "timber", "dry land"],
+    }
+    for item in _TERRAIN_PRODUCTION.get(terrain, ["foraged food"]):
+        state.add_production(item)
+    for item in _TERRAIN_SCARCITY.get(terrain, []):
+        state.add_scarcity(item)
+
     # ── Initiative rolls & species ───────────────────────────────────────────
     _vprint("\n  [INITIATIVE ROLLS]")
     initiative_rolls: dict[str, int] = {}
@@ -299,7 +329,21 @@ def main() -> None:
             if state._data["leading_faction"] == fname:
                 state._data["leading_faction"] = new_name
             agent.role = f"faction_{new_name.lower().replace(' ', '_')}"
+            # Store founding leader as historical figure
+            founding_leader = intro.get("founding_leader", "")
+            if founding_leader:
+                state.add_historical_figure({
+                    "name": founding_leader,
+                    "role": "founder",
+                    "faction": new_name,
+                    "era": 0,
+                    "deed": f"Founded {new_name} and led the initial settlement",
+                    "status": "legendary",
+                })
+
             print(f"\n  **{new_name} ({agent.faction_data['ideology']} {agent.faction_data['species']})**")
+            if founding_leader:
+                print(f"  Founded by {founding_leader}")
             if description:
                 print(f"  {description}")
             logger.log_event("faction_intro", era=0,

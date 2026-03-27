@@ -228,13 +228,20 @@ WHAT THE FACTIONS SAID AND DID THIS GENERATION:
 CHALLENGE OUTCOME:
 {result_text}
 
-A generation has passed. Write a 4-6 sentence chronicle closing this historical period. \
-Describe what changed permanently: which communities rose, which declined, what the children \
-of this generation will inherit that their parents did not have. How did the landscape change? \
-What new traditions, scars, or institutions now define this place?
+A generation has passed. Write TWO sections:
 
-Mark the passage of time. Name this period something NEW and DIFFERENT from previous periods. \
-Give the reader a sense that decades have elapsed and a new generation is about to take the stage.
+SECTION 1 — THE CHRONICLE (4-6 sentences):
+Close this historical period. Describe what changed permanently: which communities rose, \
+which declined, what the children of this generation will inherit. Name this period something \
+NEW and DIFFERENT from previous periods. Reference any named historical figures from this era.
+
+SECTION 2 — A TRAVELER ARRIVES (3-4 sentences):
+Describe what a traveler would experience arriving at the settlement RIGHT NOW. What do they \
+see first? What sounds and smells reach them? What food is offered? What do the people look \
+like, wear, do? What buildings or structures dominate the skyline? What goods are being \
+traded in the market (if one exists)? Make it vivid, sensory, and specific to the current \
+stage of development. If it's scattered camps, it should feel like frontier survival. If \
+it's a city-state, it should feel like arriving at a capital.
 
 VOICE CONSTRAINT: Write as a historian closing a chapter. No tokens, rolls, victory points, \
 strategies, or game mechanics. No words like "faction," "phase," "era," "points," or "unlocked." \

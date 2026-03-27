@@ -29,6 +29,27 @@ if TYPE_CHECKING:
 
 
 
+# Economic effects of culture options
+CULTURE_ECONOMY_EFFECTS: dict = {
+    "Farming":        {"production": ["cultivated crops", "preserved grain"], "removes_scarcity": ["grain"]},
+    "Hunting":        {"production": ["dressed hides", "smoked meat"], "trade_goods": ["furs", "bone tools"]},
+    "Trading":        {"trade_goods": ["imported luxuries", "exotic spices"], "removes_scarcity": ["metal ore"]},
+    "Raiding":        {"trade_goods": ["plundered goods", "captured livestock"], "scarcity": ["trust with neighbors"]},
+    "Manufacturing":  {"production": ["finished goods", "textiles", "tools"], "trade_goods": ["manufactured exports"]},
+    "Mining":         {"production": ["refined ore", "gemstones", "coal"], "removes_scarcity": ["metal ore", "stone"]},
+    "Personal":       {"trade_goods": ["personal crafts"]},
+    "Communal":       {"production": ["communal stores"]},
+    "Barter":         {"trade_goods": ["bartered goods"]},
+    "Currency":       {"trade_goods": ["coined money"], "production": ["minted currency"]},
+    "Banking":        {"trade_goods": ["letters of credit", "bonds"], "production": ["banking services"]},
+    "Taxes":          {"production": ["tax revenue", "state reserves"]},
+    "Earth":          {"production": ["quarried stone", "clay works"], "removes_scarcity": ["stone"]},
+    "Water":          {"production": ["irrigation", "clean water"], "removes_scarcity": ["water"]},
+    "Air":            {"trade_goods": ["wind-powered goods"], "production": ["windmills"]},
+    "Fire":           {"production": ["forged metal", "kilns", "smelted ore"], "removes_scarcity": ["metal ore"]},
+}
+
+
 class Arbiter:
     """
     Deterministic process controller for the Fantasy Settlement Creation Game.
@@ -408,6 +429,18 @@ class Arbiter:
 
         return result
 
+    def _apply_culture_economy(self, state: "SettlementState", option: str) -> None:
+        """Apply economic effects when a culture option is purchased."""
+        effects = CULTURE_ECONOMY_EFFECTS.get(option, {})
+        for item in effects.get("production", []):
+            state.add_production(item)
+        for item in effects.get("trade_goods", []):
+            state.add_trade_good(item)
+        for item in effects.get("scarcity", []):
+            state.add_scarcity(item)
+        for item in effects.get("removes_scarcity", []):
+            state.remove_scarcity(item)
+
     def _future_path_cost(self, category: str, cultures: dict) -> dict[str, int]:
         """
         Total token cost for all remaining levels in a category.
@@ -632,12 +665,24 @@ class Arbiter:
 
                 tokens = self._deduct_tokens(tokens, cost)
                 state.apply_culture_upgrade(cat, lvl, option)
+                self._apply_culture_economy(state, option)
                 self._vprint(f"      [UNLOCKED: {cat} L{lvl} — {option}]")
                 purchased_any = True
                 any_purchase_made = True
                 self._logger.log_event("culture_purchase", era=state.era,
                     faction=fname, category=cat, level=lvl, option=option,
                     cost=cost, tokens_after=dict(tokens), cooperative=False)
+
+                # Generate historical figure for this cultural shift
+                figure = agent.name_historical_figure(
+                    state.era, "culture_reform",
+                    f"Led the adoption of {option} ({cat} L{lvl}) in the settlement"
+                )
+                if figure:
+                    figure.update({"faction": fname, "era": state.era, "role": "reformer", "status": "legendary"})
+                    state.add_historical_figure(figure)
+                    self._vprint(f"      [Historical figure: {figure['name']} — {figure['deed']}]")
+                    self._logger.log_event("historical_figure", era=state.era, **figure)
 
                 new_strat = f"{cat}_strategy"
                 new_make = f"{cat}_make"
@@ -1043,6 +1088,7 @@ class Arbiter:
                     state.update_faction_tokens(fname, tokens)
 
                 state.apply_culture_upgrade(cat, lvl, option)
+                self._apply_culture_economy(state, option)
                 state.unlock_strategy(f"{cat}_strategy")
                 state.unlock_make_option(f"{cat}_make")
                 made_any = True
@@ -1526,6 +1572,19 @@ class Arbiter:
         print(outcome_output.content)
         self._logger.log(outcome_output)
         outputs.append(outcome_output.to_dict())
+
+        # Generate historical figure for the challenge
+        if leader_agent:
+            event_desc = f"{'Led the settlement through' if success else 'Failed to prevent'} the crisis: {challenge_event}"
+            figure = leader_agent.name_historical_figure(
+                state.era, "crisis_leader" if success else "fallen_leader", event_desc
+            )
+            if figure:
+                status = "legendary" if success else "cautionary"
+                figure.update({"faction": leading_name, "era": state.era, "role": "crisis_leader", "status": status})
+                state.add_historical_figure(figure)
+                self._vprint(f"    [Historical figure: {figure['name']} — {figure['deed']}]")
+                self._logger.log_event("historical_figure", era=state.era, **figure)
 
         # ── Step 5: GM narrates the boon(s) if success ─────────────────────────
         if success and boons:

@@ -39,6 +39,13 @@ class SettlementState:
             "boons": [],
             "landmarks": [],
             "places": [],
+            "historical_figures": [],
+            "economy": {
+                "trade_goods": [],
+                "production": [],
+                "scarcity": [],
+                "trade_partners": [],
+            },
             "initiative_order": [],
             "location": None,
             "terrain": None,
@@ -100,6 +107,59 @@ class SettlementState:
     def unlock_make_option(self, make_name: str) -> None:
         if make_name not in self._data["available_make_options"]:
             self._data["available_make_options"].append(make_name)
+
+    # ── Historical figures ──────────────────────────────────────────────────
+
+    def add_historical_figure(self, figure: dict) -> None:
+        """Add a named historical figure. Keys: name, role, faction, era, deed, status."""
+        self._data["historical_figures"].append(figure)
+
+    def historical_figures_summary(self) -> str:
+        figures = self._data.get("historical_figures", [])
+        if not figures:
+            return ""
+        lines = ["Notable historical figures:"]
+        for f in figures[-10:]:  # last 10 to keep prompt manageable
+            status = f.get("status", "legendary")
+            lines.append(f"  - {f['name']} ({f.get('faction', '?')}, gen {f.get('era', '?')}): {f.get('deed', '')} [{status}]")
+        return "\n".join(lines)
+
+    # ── Economy ──────────────────────────────────────────────────────────────
+
+    def add_trade_good(self, good: str) -> None:
+        if good not in self._data["economy"]["trade_goods"]:
+            self._data["economy"]["trade_goods"].append(good)
+
+    def add_production(self, item: str) -> None:
+        if item not in self._data["economy"]["production"]:
+            self._data["economy"]["production"].append(item)
+
+    def add_scarcity(self, item: str) -> None:
+        if item not in self._data["economy"]["scarcity"]:
+            self._data["economy"]["scarcity"].append(item)
+
+    def remove_scarcity(self, item: str) -> None:
+        self._data["economy"]["scarcity"] = [s for s in self._data["economy"]["scarcity"] if s != item]
+
+    def add_trade_partner(self, partner: dict) -> None:
+        """Add external trade partner. Keys: name, location, relationship."""
+        existing_names = [p["name"] for p in self._data["economy"]["trade_partners"]]
+        if partner["name"] not in existing_names:
+            self._data["economy"]["trade_partners"].append(partner)
+
+    def economy_summary(self) -> str:
+        econ = self._data.get("economy", {})
+        lines = []
+        if econ.get("production"):
+            lines.append(f"Production: {', '.join(econ['production'])}")
+        if econ.get("trade_goods"):
+            lines.append(f"Trade goods: {', '.join(econ['trade_goods'])}")
+        if econ.get("scarcity"):
+            lines.append(f"Scarcity: {', '.join(econ['scarcity'])}")
+        if econ.get("trade_partners"):
+            partners = [f"{p['name']} ({p.get('relationship', 'neutral')})" for p in econ["trade_partners"]]
+            lines.append(f"Trade partners: {', '.join(partners)}")
+        return "\n".join(lines) if lines else "Economy: subsistence, no established trade"
 
     # ── Geography ──────────────────────────────────────────────────────────────
 
@@ -248,9 +308,16 @@ class SettlementState:
             lines.append(f"Landmarks: {d['landmark_description']}")
         lines.append(f"Stage: {self.settlement_stage()}")
         lines.append(self.places_summary())
+        hist = self.historical_figures_summary()
+        econ = self.economy_summary()
         lines += [
             self.faction_summary(),
             self.culture_summary(),
+            econ,
+        ]
+        if hist:
+            lines.append(hist)
+        lines += [
             f"Strategies available: {', '.join(d['available_strategies'])}",
             f"Current challenge: {d['current_challenge'] or 'none'}",
             f"Boons: {', '.join(d['boons']) if d['boons'] else 'none'}",

@@ -583,6 +583,43 @@ Write as history, not a turn report.
 """
         return self._call_llm(prompt, era, "strategy_narrative", max_tokens=256)
 
+    def name_historical_figure(
+        self, era: int, event_type: str, event_description: str,
+    ) -> dict | None:
+        """Generate a named historical figure for a significant event. Returns {name, deed} or None."""
+        prompt = f"""\
+You are the chronicler for {self.faction_data['name']}, a {self.faction_data['organization_type']} of {self.faction_data['species']}.
+
+A significant event has occurred:
+Type: {event_type}
+What happened: {event_description}
+
+Name the individual from {self.faction_data['name']} most associated with this event. This person \
+will be remembered across generations — as a founder, reformer, architect, hero, or cautionary tale.
+
+Give them a name appropriate to their species ({self.faction_data['species']}) and a one-sentence \
+description of their lasting contribution or notoriety.
+
+Output in this exact format:
+
+<historical_figure>
+{{
+  "name": "<full name>",
+  "deed": "<one sentence: what they did and why it's remembered>"
+}}
+</historical_figure>
+
+Nothing else.
+"""
+        output = self._call_llm(prompt, era, "historical_figure", max_tokens=128)
+        match = re.search(r"<historical_figure>(.*?)</historical_figure>", output.content, re.DOTALL)
+        if not match:
+            return None
+        try:
+            return json.loads(match.group(1).strip())
+        except json.JSONDecodeError:
+            return None
+
     def _call_llm(self, prompt: str, round_num: int, phase: str, max_tokens: int = 1024) -> AgentOutput:
         import anthropic
         import config
@@ -696,7 +733,8 @@ Your people have journeyed here to build something lasting. As their leader, int
 
 1. Choose a name for your organization — something that reflects your species, your ideology, and \
 your ambitions. Not a generic label like "The Guild" — a proper name with character.
-2. Explain in 2-3 sentences why your people are settling this land and what they hope to achieve. \
+2. Name the founding leader — an individual whose name will be remembered for generations.
+3. Explain in 2-3 sentences why your people are settling this land and what they hope to achieve. \
 Ground it in the geography and your worldview.
 
 Output your introduction in this exact format:
@@ -705,6 +743,7 @@ Output your introduction in this exact format:
 {{
   "faction_name": "<your organization's name>",
   "organization_type": "<guild|family|church|warband|company|council|circle|order|tribe|other>",
+  "founding_leader": "<full name of the leader who brought your people here>",
   "description": "<2-3 sentences: why you are here, what you hope to build>"
 }}
 </faction_intro>
