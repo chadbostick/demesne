@@ -129,7 +129,16 @@ class Arbiter:
 
             # ── Mechanical execution ─────────────────────────────────────────
             stance = faction.get("current_stance", "pursue_primary")
-            strategy, color = self._stance_to_strategy(stance, faction, state)
+
+            # Check if make exchange would let the faction afford a goal-relevant purchase
+            make_override = self._should_make_instead(faction, state)
+            if make_override:
+                stance = "make"
+                color = make_override["exchange_color"]
+                strategy = "make"
+                print(f"    [{fname} overriding to MAKE: {make_override['reason']}]")
+            else:
+                strategy, color = self._stance_to_strategy(stance, faction, state)
 
             color_level = state.get_color_level(color)
             cu = state.color_upgrades[color]
@@ -143,15 +152,17 @@ class Arbiter:
                     give = tokens.get(color, 0)  # spend all available tokens of this color
                     receive = make_receive_for_level(color_level, give)
                     if give >= 1:
-                        # Pick one receive color — best for faction's primary goal
-                        primary_cat = faction.get("goals", {}).get("primary", {}).get("category", "")
-                        receive_color = CULTURE_STRATEGY_COLOR.get(primary_cat, random.choice(_all_colors))
-                        receive_colors = [receive_color] * receive
+                        # Distribute received tokens: cover goal shortfalls first, then primary goal color
+                        receive_colors = self._pick_make_receive_colors(faction, tokens, color, receive, state)
                         tokens = apply_make_exchange(tokens, color, give, receive, receive_colors)
                         tok_str = ", ".join(f"{c}:{n}" for c, n in tokens.items())
+                        # Summarize received colors
+                        from collections import Counter
+                        recv_counts = Counter(receive_colors)
+                        recv_str = ", ".join(f"{n} {c}" for c, n in recv_counts.items())
                         print(
                             f"    {fname} [{custom_make_name}] gave {give} {color},"
-                            f" received {receive} {receive_color}"
+                            f" received {recv_str}"
                         )
                         print(f"      [Tokens now: {tok_str}]")
                         state.update_faction_tokens(fname, tokens)
@@ -259,6 +270,137 @@ class Arbiter:
 
         color = color_for_cat(cat)
         return strat_for_color(color), color
+
+    def _should_make_instead(self, faction: dict, state: "SettlementState") -> dict | None:
+        """
+        Check if the faction should override to a make exchange.
+        Returns {"reason": "..."} if make is better, None otherwise.
+
+        Logic: for each goal-relevant culture the faction could buy next,
+        check if they have surplus tokens of one color that could be exchanged
+        to cover a shortfall in another color needed for that purchase.
+        """
+        tokens = dict(faction["tokens"])
+        goals = faction.get("goals", {})
+        cultures = state.cultures
+
+        # Collect goal-relevant categories and their target options
+        target_cats: list[tuple[str, str]] = []  # (category, reason)
+        p = goals.get("primary", {})
+        if p.get("category"):
+            target_cats.append((p["category"], f"primary goal ({p.get('option', '?')})"))
+        for s in goals.get("secondary", []):
+            if s.get("category"):
+                target_cats.append((s["category"], f"secondary goal ({s.get('option', '?')})"))
+        t = goals.get("tertiary", {})
+        if t.get("category"):
+            target_cats.append((t["category"], f"tertiary goal ({t['category']})"))
+
+        for cat, reason in target_cats:
+            cat_data = cultures.get(cat, {})
+            next_lvl = cat_data.get("level", 0) + 1
+            if next_lvl > 3:
+                continue
+            if not can_purchase(cat, next_lvl, cultures):
+                continue
+
+            cost = get_cost(cat, next_lvl)
+
+            # What colors are we short on, and what do we have surplus of?
+            shortfall: dict[str, int] = {}
+            for c, needed in cost.items():
+                have = tokens.get(c, 0)
+                if have < needed:
+                    shortfall[c] = needed - have
+
+            if not shortfall:
+                # Already can afford — no need to make, just buy in investment phase
+                continue
+
+            total_short = sum(shortfall.values())
+
+            # Check each color for surplus that could be exchanged
+            for surplus_color in ["red", "blue", "green", "orange", "pink"]:
+                if surplus_color in cost:
+                    # Can't exchange the same color we need for the purchase
+                    surplus_available = tokens.get(surplus_color, 0) - cost.get(surplus_color, 0)
+                else:
+                    surplus_available = tokens.get(surplus_color, 0)
+
+                if surplus_available < 1:
+                    continue
+
+                color_level = state.get_color_level(surplus_color)
+                receive = make_receive_for_level(color_level, surplus_available)
+
+                if receive >= total_short:
+                    return {
+                        "reason": (
+                            f"can exchange {surplus_available} {surplus_color} → "
+                            f"{receive} tokens to cover {cat} L{next_lvl} shortfall "
+                            f"({reason})"
+                        ),
+                        "exchange_color": surplus_color,
+                    }
+
+        return None
+
+    def _pick_make_receive_colors(
+        self, faction: dict, tokens: dict, exchange_color: str,
+        receive_count: int, state: "SettlementState"
+    ) -> list[str]:
+        """
+        Decide which colors to receive from a make exchange.
+        Priority: cover shortfalls for affordable goal purchases, then primary goal color.
+        """
+        _all_colors = ["red", "blue", "green", "orange", "pink"]
+        result: list[str] = []
+        remaining = receive_count
+        goals = faction.get("goals", {})
+        cultures = state.cultures
+
+        # Simulate tokens after the exchange (minus the give)
+        sim_tokens = dict(tokens)
+        sim_tokens[exchange_color] = 0  # will be spent
+
+        # Find shortfalls for goal-relevant purchases
+        target_cats = []
+        p = goals.get("primary", {})
+        if p.get("category"):
+            target_cats.append(p["category"])
+        for s in goals.get("secondary", []):
+            if s.get("category"):
+                target_cats.append(s["category"])
+        t = goals.get("tertiary", {})
+        if t.get("category"):
+            target_cats.append(t["category"])
+
+        for cat in target_cats:
+            if remaining <= 0:
+                break
+            cat_data = cultures.get(cat, {})
+            next_lvl = cat_data.get("level", 0) + 1
+            if next_lvl > 3 or not can_purchase(cat, next_lvl, cultures):
+                continue
+            cost = get_cost(cat, next_lvl)
+            for c, needed in cost.items():
+                if remaining <= 0:
+                    break
+                have = sim_tokens.get(c, 0)
+                short = needed - have
+                if short > 0:
+                    take = min(short, remaining)
+                    result.extend([c] * take)
+                    sim_tokens[c] = sim_tokens.get(c, 0) + take
+                    remaining -= take
+
+        # Fill remainder with primary goal color
+        if remaining > 0:
+            primary_cat = goals.get("primary", {}).get("category", "")
+            fallback = CULTURE_STRATEGY_COLOR.get(primary_cat, random.choice(_all_colors))
+            result.extend([fallback] * remaining)
+
+        return result
 
     def _find_make_option_by_color(self, color: str) -> dict | None:
         for opt in BASE_MAKE_OPTIONS.values():
