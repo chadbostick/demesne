@@ -11,11 +11,8 @@ def pause(message: str = "  ── Press Space/Enter to continue or Esc to quit 
     - Always at end of era (end_of_era=True)
     - At all other points only if config.ALL_PAUSES is True and era > 1
     """
-    if not end_of_era:
-        if not config.ALL_PAUSES:
-            return
-        if era <= 1:
-            return
+    if not config.ALL_PAUSES:
+        return
     print(f"\n{message} ", end="", flush=True)
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
