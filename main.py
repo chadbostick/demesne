@@ -299,7 +299,7 @@ def main() -> None:
 
     # Create timestamped run subfolder
     timestamp = datetime.now().strftime("%Y%m%d-%H%M")
-    run_dir = os.path.join(args.output_dir, f"Settlement {timestamp}")
+    run_dir = os.path.join(args.output_dir, f"{timestamp} Settlement")
     os.makedirs(run_dir, exist_ok=True)
 
     print(f"Demesne simulation starting...")
@@ -475,7 +475,7 @@ def main() -> None:
     # Rename run folder to settlement name
     settlement_name_clean = re.sub(r'[^\w\s\-]', '', final_state._data["name"]).strip()
     if settlement_name_clean:
-        final_dir = os.path.join(args.output_dir, f"{settlement_name_clean} {timestamp}")
+        final_dir = os.path.join(args.output_dir, f"{timestamp} {settlement_name_clean}")
         if not os.path.exists(final_dir):
             os.rename(run_dir, final_dir)
             run_dir = final_dir
