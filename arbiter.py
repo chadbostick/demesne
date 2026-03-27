@@ -414,13 +414,13 @@ class Arbiter:
         Check if the faction should override to a make exchange.
         Returns {"reason", "exchange_color", "receive_color", "give"} or None.
 
-        Logic:
-        1. For each goal category, compute the NEXT level's shortfall.
-        2. Compute the FULL remaining path cost across all goal categories
-           to know which colors are reserved for future buys.
-        3. Only exchange tokens that are genuinely surplus (not needed for
-           any future goal purchase), and only exchange enough to cover
-           the immediate shortfall.
+        Rules:
+        - Only exchange colors that are NOT needed for any upcoming goal purchase
+          (truly surplus — not needed anywhere on any goal path)
+        - Never trade one needed color for another needed color
+        - At L0 (1:1 exchange), only trade if the surplus color has zero
+          future need across all goal paths
+        - Only exchange enough to cover the immediate shortfall
         """
         tokens = dict(faction["tokens"])
         goals = faction.get("goals", {})
@@ -463,43 +463,47 @@ class Arbiter:
             if not shortfall:
                 continue
 
-            # For each short color, check if we have a surplus color to exchange
+            # For each short color, check if we have a truly surplus color to exchange
             for short_color, short_amount in shortfall.items():
                 for surplus_color in ["red", "blue", "green", "orange", "pink"]:
                     if surplus_color == short_color:
                         continue
 
                     have = tokens.get(surplus_color, 0)
-                    # Reserve tokens needed for this purchase's cost
-                    reserved_for_purchase = cost.get(surplus_color, 0)
-                    # Reserve tokens needed for future goal purchases
-                    reserved_for_future = max(0, future_needs.get(surplus_color, 0) - have)
-                    # True surplus: what we have minus all reservations
-                    # (future_needs already includes this level's cost)
-                    surplus_available = have - reserved_for_purchase
-                    # Don't sacrifice more than we can afford to lose for future needs
-                    # But allow exchanging if we have more than the full future path needs
-                    future_remaining = future_needs.get(surplus_color, 0)
-                    safe_to_exchange = max(0, have - future_remaining)
-                    # Use the lesser of: surplus after this purchase, or safe-to-exchange
-                    exchangeable = min(surplus_available, safe_to_exchange) if safe_to_exchange > 0 else surplus_available
-
-                    if exchangeable < 1:
+                    if have < 1:
                         continue
 
+                    # How much of this color is needed for THIS purchase?
+                    needed_for_purchase = cost.get(surplus_color, 0)
+                    # How much is needed across ALL future goal purchases?
+                    needed_for_future = future_needs.get(surplus_color, 0)
+
+                    # True surplus: tokens beyond what any goal path needs
+                    true_surplus = have - needed_for_future
+                    if true_surplus < 1:
+                        continue
+
+                    # Also must have enough left for this purchase's cost of this color
+                    exchangeable = have - max(needed_for_purchase, needed_for_future)
+                    if exchangeable < 1:
+                        # Special case: if this color has ZERO future need, we can exchange
+                        if needed_for_future == 0:
+                            exchangeable = have - needed_for_purchase
+                        if exchangeable < 1:
+                            continue
+
                     color_level = state.get_color_level(surplus_color)
+                    multiplier = color_level + 1
 
                     # Calculate minimum give to cover the shortfall
-                    # Formula: receive = give * (level + 1), so give = ceil(short / (level + 1))
-                    multiplier = color_level + 1
-                    min_give = (short_amount + multiplier - 1) // multiplier  # ceiling division
+                    min_give = (short_amount + multiplier - 1) // multiplier
                     give = min(min_give, exchangeable)
                     receive = make_receive_for_level(color_level, give)
 
                     if receive >= short_amount:
                         return {
                             "reason": (
-                                f"exchange {give} {surplus_color} → "
+                                f"exchange {give} {surplus_color} (no future need) → "
                                 f"{receive} {short_color} to cover {cat} L{next_lvl} "
                                 f"shortfall ({reason})"
                             ),
@@ -1222,13 +1226,32 @@ class Arbiter:
             outputs.append(plan_output.to_dict())
 
         # ── Step 1: Leader donates (no LLM) ──────────────────────────────────
+        # Early game: leaders are stingy (risk it with fewer tokens).
+        # As settlement grows, leaders become more conservative (donate more).
+        places_count = len(state._data.get("places", []))
+        if places_count == 0:
+            # Scattered camps: donate nothing unless absolutely necessary
+            willingness = 0  # only donate if roll alone can't win
+        elif places_count <= 2:
+            # Early villages: donate minimally
+            willingness = 1
+        else:
+            # Established settlement: donate what's needed
+            willingness = 2
+
         needed = max(0, difficulty - 10 - leader_vp_bonus)
         leader_tokens = dict(leader_faction["tokens"])
         leader_total = sum(leader_tokens.values())
-        if leader_total > 0:
-            leader_donation = min(leader_total, max(1, needed))
+
+        if willingness == 0:
+            # Scattered camps: only donate if difficulty is very high
+            leader_donation = min(leader_total, max(0, needed - 5)) if needed > 5 else 0
+        elif willingness == 1:
+            # Early villages: donate at most 1
+            leader_donation = min(leader_total, min(1, needed)) if needed > 0 else 0
         else:
-            leader_donation = 0
+            # Established: donate what's needed
+            leader_donation = min(leader_total, max(1, needed)) if leader_total > 0 else 0
 
         can_solicit = leader_donation >= 1
         can_compel = leader_donation >= 2 and needed > leader_donation
