@@ -13,13 +13,6 @@ class GMAgent(BaseAgent):
 
     role = "gm"
     constraints = []
-    prompt_template = ""  # not used directly
-
-    def build_prompt(self, context: dict, injected) -> str:
-        return ""
-
-    def run(self, context: dict, round_num: int, phase: str, injected=None) -> AgentOutput:
-        raise NotImplementedError("Use narrate_challenge() or narrate_end_of_era() directly.")
 
     def narrate_challenge(
         self,

@@ -9,11 +9,5 @@ class PhaseEngine:
     def __init__(self, phases: list[PhaseConfig] | None = None) -> None:
         self._phases = phases if phases is not None else list(DEFAULT_PHASES)
 
-    def phases(self) -> list[PhaseConfig]:
-        return list(self._phases)
-
     def __iter__(self) -> Iterator[PhaseConfig]:
         return iter(self._phases)
-
-    def __len__(self) -> int:
-        return len(self._phases)

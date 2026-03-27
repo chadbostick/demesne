@@ -125,15 +125,6 @@ STRATEGIC_STANCES: dict = {
     "make":             {"description": "Exchange tokens to build something physical"},
 }
 
-# Maps token color to canonical Make structure type name
-COLOR_TO_MAKE_TYPE: dict = {
-    "red":    "Holy Site",
-    "blue":   "Commons",
-    "green":  "Marker",
-    "orange": "Storehouse",
-    "pink":   "Workyard",
-}
-
 # Challenge categories — easily extensible to hundreds of entries
 CHALLENGE_CATEGORIES: list = [
     {"category": "Envoy Arrives",   "description": "A powerful visitor arrives with demands, offers, or secrets."},

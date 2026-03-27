@@ -18,12 +18,10 @@ from mechanics.dice import roll
 from state.settlement import SettlementState
 from agents.faction import FactionAgent
 from agents.gm import GMAgent
-from agents.registry import AgentRegistry
 from phases.engine import PhaseEngine
 from logger import ActionLogger
 from arbiter import Arbiter
 from mechanics.ideologies import IDEOLOGIES, PROTOTYPE_IDEOLOGIES
-from mechanics.scoring import score_all_factions
 from mechanics.strategies import STRATEGIC_STANCES
 from mechanics.worldbuilding import LOCATIONS, TERRAINS, DND5_RACES
 
@@ -49,19 +47,6 @@ def build_faction_data(ideology_name: str, faction_index: int) -> dict:
         },
         "needs_reconsideration": False,
     }
-
-
-def build_factions(ideology_names: list[str]) -> tuple[list[FactionAgent], SettlementState]:
-    """Build faction agents and register them in the settlement state."""
-    state = SettlementState.__new__(SettlementState)
-    state.__init__("placeholder")  # will be overwritten by caller
-
-    agents = []
-    for i, name in enumerate(ideology_names):
-        faction_data = build_faction_data(name, i)
-        agents.append(FactionAgent(faction_data))
-
-    return agents, [build_faction_data(n, i) for i, n in enumerate(ideology_names)]
 
 
 def write_final_summary(output_dir: str, state: SettlementState, all_actions: list[dict]) -> None:

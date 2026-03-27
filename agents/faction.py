@@ -12,7 +12,7 @@ import re
 from agents.base import BaseAgent, AgentOutput
 from mechanics.ideologies import IDEOLOGIES
 from mechanics.cultures import CULTURE_TREE
-from mechanics.strategies import STRATEGIC_STANCES, COLOR_TO_MAKE_TYPE
+from mechanics.strategies import STRATEGIC_STANCES
 from mechanics.rename_examples import RENAME_EXAMPLES
 
 
@@ -148,15 +148,6 @@ class FactionAgent(BaseAgent):
         recent = self._recent_block(context)
         current_stance = self.faction_data.get("current_stance") or "pursue_primary"
 
-        # Build make type hint if make is available
-        make_hint = ""
-        if "make" in available_strategies:
-            tok_colors = [c for c, n in tokens.items() if n > 0]
-            if tok_colors:
-                example_color = tok_colors[0]
-                make_type = COLOR_TO_MAKE_TYPE.get(example_color, "structure")
-                make_hint = f"\nIf choosing 'make': you will name and describe the physical structure built. The structure type is determined by the color exchanged (e.g. red → Holy Site, blue → Commons, green → Marker, orange → Storehouse, pink → Workyard)."
-
         prompt = f"""\
 You are {self.faction_data['name']}, a {self.faction_data['organization_type']} of {self.faction_data['species']}.
 
@@ -180,7 +171,7 @@ YOUR CURRENT STANCE: {current_stance}
 AVAILABLE STANCES:
 {self._stance_descriptions()}
 
-Each stance maps to a base action: pursue_primary/secondary/tertiary/coordinate/oppose → earn tokens via pray/discuss/lead/organize/forage. "make" → exchange tokens to build.{make_hint}
+Each stance maps to a base action: pursue_primary/secondary/tertiary/coordinate/oppose → earn tokens via pray/discuss/lead/organize/forage. "make" → exchange tokens to build.
 
 VOICE CONSTRAINT: Write your narrative as an in-character settler. Do NOT name token colors, reference victory points, or describe game mechanics. Describe your people's actions and motivations as if you are living in this world.
 
@@ -190,15 +181,9 @@ Choose your stance and the concrete strategy that enacts it. Output your choice 
 {{
   "stance": "<stance name>",
   "strategy": "<pray|discuss|lead|organize|forage|make>",
-  "make_exchange_color": null,
-  "make_receive_colors": null,
-  "make_structure_name": null,
-  "make_structure_description": null,
   "narrative": "<1-2 sentences in-character, no token color names, no VP references>"
 }}
 </strategy_choice>
-
-If strategy is "make": fill make_exchange_color, make_receive_colors (list of colors, length = 2 × tokens given), make_structure_name (what your people call it), and make_structure_description (1 sentence on how it functions).
 """
         return self._call_llm(prompt, round_num, "strategy")
 
@@ -656,10 +641,3 @@ Nothing else.
             return json.loads(match.group(1).strip())
         except json.JSONDecodeError:
             return {"tokens_donated": {}, "narrative": ""}
-
-    # Required by BaseAgent ABC — delegates to strategy run as default
-    def build_prompt(self, context: dict, injected) -> str:
-        return ""
-
-    def run(self, context: dict, round_num: int, phase: str, injected=None) -> AgentOutput:
-        raise NotImplementedError("Use run_strategy(), run_investment(), or run_challenge() directly.")

@@ -72,18 +72,6 @@ class SettlementState:
     def set_leading_faction(self, name: str) -> None:
         self._data["leading_faction"] = name
 
-    def rotate_leading_faction(self) -> str:
-        """Move to the next faction in list order. Returns new leading faction name."""
-        factions = self._data["factions"]
-        if not factions:
-            return ""
-        current = self._data["leading_faction"]
-        names = [f["name"] for f in factions]
-        idx = names.index(current) if current in names else -1
-        new_idx = (idx + 1) % len(names)
-        self._data["leading_faction"] = names[new_idx]
-        return self._data["leading_faction"]
-
     # ── Culture management ────────────────────────────────────────────────────
 
     def apply_culture_upgrade(self, category: str, level: int, option: str) -> None:
