@@ -844,8 +844,22 @@ class Arbiter:
             print(f"    [Boon: {boon}]")
             challenge_result = {"success": True, "roll": d20, "total": total, "boon": boon}
         else:
-            new_leader = state.rotate_leading_faction()
-            print(f"    [Leading faction changed to: {new_leader}]")
+            # Re-roll initiative for all factions
+            print(f"\n    [INITIATIVE RE-ROLL]")
+            new_initiative: dict[str, int] = {}
+            for agent in self._factions:
+                fname = agent.faction_data["name"]
+                r = roll(20)
+                new_initiative[fname] = r
+                print(f"      {fname}: rolled {r}")
+            new_order = sorted(new_initiative, key=lambda n: new_initiative[n], reverse=True)
+            state.set_initiative_order(new_order)
+            # Re-sync faction_data references
+            for agent in self._factions:
+                agent.faction_data = state.get_faction(agent.faction_data["name"])
+            new_leader = new_order[0]
+            print(f"    [New leading faction: {new_leader}]")
+            print(f"    [New initiative order: {', '.join(new_order)}]")
             challenge_result = {"success": False, "roll": d20, "total": total, "new_leader": new_leader}
 
         state.advance_difficulty(failed=not success)
