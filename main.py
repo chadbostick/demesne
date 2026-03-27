@@ -9,7 +9,9 @@ Usage:
 import argparse
 import json
 import os
+import re
 import sys
+from datetime import datetime
 
 import random
 import config
@@ -203,15 +205,20 @@ def main() -> None:
     num_factions = max(config.MIN_FACTIONS, min(num_factions, len(IDEOLOGIES)))
     chosen_ideologies = random.sample(list(IDEOLOGIES.keys()), num_factions)
 
+    # Create timestamped run subfolder
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M")
+    run_dir = os.path.join(args.output_dir, f"Settlement {timestamp}")
+    os.makedirs(run_dir, exist_ok=True)
+
     print(f"Demesne simulation starting...")
     _vprint(f"  Settlement : {args.settlement_name}")
     _vprint(f"  Eras       : {args.eras}")
-    _vprint(f"  Output dir : {args.output_dir}")
+    _vprint(f"  Output dir : {run_dir}")
     _vprint(f"  Model      : {config.MODEL}")
     _vprint(f"  Factions   : {num_factions} — {', '.join(chosen_ideologies)}")
 
     # Initialize logger early so pre-game events are captured
-    logger = ActionLogger(args.output_dir)
+    logger = ActionLogger(run_dir)
 
     # Build state and factions
     state = SettlementState(name=args.settlement_name)
@@ -325,8 +332,17 @@ def main() -> None:
         memory_window=args.memory_window,
     )
 
-    final_state = arbiter.run(state, max_eras=args.eras, output_dir=args.output_dir)
-    write_final_summary(args.output_dir, final_state, logger.all_actions, logger.all_events, final_state.era)
+    final_state = arbiter.run(state, max_eras=args.eras, output_dir=run_dir)
+    write_final_summary(run_dir, final_state, logger.all_actions, logger.all_events, final_state.era)
+
+    # Rename run folder to settlement name
+    settlement_name_clean = re.sub(r'[^\w\s\-]', '', final_state._data["name"]).strip()
+    if settlement_name_clean:
+        final_dir = os.path.join(args.output_dir, f"{settlement_name_clean} {timestamp}")
+        if not os.path.exists(final_dir):
+            os.rename(run_dir, final_dir)
+            run_dir = final_dir
+            _vprint(f"  Output renamed to: {run_dir}")
 
     # Print final scores
     print("\nFinal Victory Points:")
