@@ -343,15 +343,17 @@ You are {self.faction_data['name']}, leading the settlement through a crisis.
 
 {self._ideology_block()}
 {culture_section}
-THE CRISIS:
+THE CRISIS OF THIS GENERATION:
 {challenge_text}
 
-As the leader, describe what your people will do to face this challenge. What resources will you \
-commit? What strategy will you employ? Speak as a leader rallying their people before the outcome \
-is known.
+This is not a single battle or a brief storm — this is the defining crisis of an entire \
+generation. It will be remembered for centuries. As the leader, describe what your people will \
+commit to face this. What will be sacrificed? What institutions mobilized? What will the elders \
+tell the children about this moment?
 
-VOICE CONSTRAINT: Write as an in-character settler leader. Do NOT mention tokens, dice rolls, \
-victory points, difficulty numbers, or any game mechanics. 2-3 sentences only.
+Speak as a leader who knows the stakes are generational. 2-3 sentences.
+
+VOICE CONSTRAINT: No tokens, dice, victory points, or game mechanics.
 """
         return self._call_llm(prompt, era, "challenge_plan", max_tokens=256)
 
@@ -523,16 +525,18 @@ You are the chronicler for {self.faction_data['name']}, a {self.faction_data['or
 
 {self._ideology_block()}
 {culture_section}
-THIS ERA THEY FOCUSED ON:
+DURING THIS GENERATION:
 {activity_line}
 {result_line}
 
-Write 2-3 sentences describing what {self.faction_data['name']} did and why it matters to \
-them. Write in THIRD PERSON — refer to the faction by name or as "they", never "we" or "our". \
-Make it vivid and grounded in their worldview.
+Each era spans a generation — decades of life, not days. Write 2-3 sentences describing what \
+{self.faction_data['name']} accomplished across this period and how it shaped their people. \
+Describe the work of years: traditions taking root, children growing up within new practices, \
+elders passing down what was built. Write in THIRD PERSON — refer to the faction by name or \
+as "they", never "we" or "our".
 
-VOICE CONSTRAINT: No token colors, no rolls, no victory points, no game mechanics, no faction \
-labels, no fantasy clichés. Pure in-character settler voice.
+VOICE CONSTRAINT: No token colors, no rolls, no victory points, no game mechanics. \
+Write as history, not a turn report.
 """
         return self._call_llm(prompt, era, "strategy_narrative", max_tokens=256)
 

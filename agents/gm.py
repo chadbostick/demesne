@@ -27,19 +27,21 @@ You are the chronicler of a fantasy settlement. You record history as it unfolds
 SETTLEMENT STATE:
 {state_summary}
 
-A CHALLENGE EVENT has been drawn: "{challenge_text}"
+THE CRISIS OF THIS GENERATION: "{challenge_text}"
 
-Make this specific to THIS settlement. Consider the geography, terrain, established cultures, \
-existing structures, and the people who live here. If the event seems impossible for this region \
-(e.g. "Tsunami" in a desert), interpret it as a metaphor or find a creative way it manifests \
-here — perhaps a sand tsunami, a wave of locusts, or a flood of refugees.
+This is not a brief event — this is the defining crisis of an entire generation. It unfolds over \
+years or decades and will be remembered for centuries. Make it specific to THIS settlement: its \
+geography, terrain, established cultures, structures, and people. If the event seems impossible \
+for this region (e.g. "Tsunami" in a desert), interpret it as a metaphor or find a creative way \
+it manifests here.
 
-In 2-4 sentences, narrate this challenge in vivid, grounded prose. Add unique details: names of \
-places, descriptions of what people see, specific consequences. Set the stakes. Do not resolve \
-the challenge yet — only introduce it.
+In 3-5 sentences, chronicle what befell the people. Name specific places, describe what families \
+experienced, how daily life was disrupted across years. Set the stakes in generational terms: \
+what will be lost if this is not overcome? What will the children inherit? Do not resolve the \
+crisis yet — only describe its weight.
 
-VOICE CONSTRAINT: Write as a witness to real events. Do NOT mention tokens, rolls, victory points, \
-game mechanics, or faction names as organizational labels. No metagaming language.
+VOICE CONSTRAINT: Write as a historian looking back across decades. No tokens, rolls, victory \
+points, or game mechanics. No metagaming language.
 """
         return self._call_llm(prompt, round_num, "challenge_narration")
 
@@ -67,7 +69,7 @@ You are the chronicler of a fantasy settlement. You record history as it unfolds
 SETTLEMENT STATE:
 {state_summary}
 
-THE CRISIS:
+THE CRISIS OF THIS GENERATION:
 {challenge_text}
 
 THE LEADER'S PLAN:
@@ -79,12 +81,13 @@ HOW THE SETTLEMENT RESPONDED:
 OUTCOME: The settlement {outcome_word}.
 {boon_line}
 
-Write 2-3 sentences describing what actually happened. Did the plan work? What went wrong or \
-right? How did the people respond? Write in past tense, third-person omniscient.
+This crisis defined a generation. Write 3-5 sentences describing what happened over the years \
+it took to resolve. How did families endure? What was permanently changed? If they prevailed, \
+what scars remain alongside the triumph? If they failed, what was lost that can never return? \
+Describe consequences that children will grow up knowing.
 
-VOICE CONSTRAINT: Write as a historian recording real events. Do NOT mention tokens, rolls, \
-victory points, difficulty, or any game mechanics. No metagaming language. Ground every \
-observation in the lived reality of the settlers.
+VOICE CONSTRAINT: Write as a historian looking back across decades. No tokens, rolls, \
+victory points, or game mechanics.
 """
         return self._call_llm(prompt, round_num, "challenge_outcome", max_tokens=256)
 
@@ -108,15 +111,14 @@ THE SETTLEMENT OVERCAME A CHALLENGE:
 AS A RESULT, THE SETTLEMENT RECEIVES:
 {boon_list}
 
-Narrate what the settlement gains. Be specific and flavorful — give things proper names, describe \
-what they look like, where they are, how they change daily life. These are lasting additions to \
-the settlement that will be remembered for generations.
+These are the lasting legacies born from overcoming the crisis — they will define the next \
+generation and reshape how the settlement grows. Narrate what emerged from the struggle.
 
-Do NOT just restate the boon name. Transform it into a vivid, grounded description of what \
-actually appeared, was discovered, or changed. Consider the settlement's geography, cultures, \
-and the people who live here.
+Give things proper names. Describe how they changed the settlement permanently — not just \
+what appeared, but how life is different for the children born after. These are the stories \
+that grandparents will tell. Transform each boon into a vivid, generational milestone.
 
-Write 2-4 sentences per boon. Past tense, third-person omniscient.
+Write 3-5 sentences per boon. Past tense, third-person omniscient.
 
 VOICE CONSTRAINT: Write as a historian. No tokens, rolls, victory points, or game mechanics.
 """
@@ -209,13 +211,18 @@ WHAT THE FACTIONS SAID AND DID THIS ERA:
 CHALLENGE OUTCOME:
 {result_text}
 
-Write a 3-5 sentence End of Era chronicle. Describe how the settlement has changed, which groups
-gained or lost influence, and what the era's events mean for the people living here.
+A generation has passed. Write a 4-6 sentence chronicle closing this historical period. \
+Describe what changed permanently: which communities rose, which declined, what the children \
+of this generation will inherit that their parents did not have. How did the landscape change? \
+What new traditions, scars, or institutions now define this place?
 
-VOICE CONSTRAINT: Write as a witness to real history — a chronicler, not a game commentator.
-Do NOT mention tokens, rolls, victory points, strategies, or any game mechanics. Do NOT use
-words like "faction," "phase," "era," "points," or "unlocked." Refer to groups by their nature
-and ideology. No metagaming language of any kind. Ground every observation in the lives of settlers.
+Mark the passage of time. Name the period if it deserves one ("The Quiet Years," "The Age of \
+the Broken Channel"). Give the reader a sense that decades have elapsed and a new generation \
+is about to take the stage.
+
+VOICE CONSTRAINT: Write as a historian closing a chapter. No tokens, rolls, victory points, \
+strategies, or game mechanics. No words like "faction," "phase," "era," "points," or "unlocked." \
+Refer to groups by their nature and character.
 """
         return self._call_llm(prompt, round_num, "end_of_era")
 
@@ -234,9 +241,10 @@ A CULTURAL SHIFT HAS TAKEN ROOT:
 The people of {settlement_name} have embraced a new way: {option} — a shift in how the community \
 understands {category}. This was driven by {purchaser}.
 
-In 2-3 sentences, chronicle what this means for daily life. How do people live differently now? \
-What has changed in the rhythm, the rituals, the relationships of the community? \
-This is permanent — every settler lives within this now, whether they chose it or not.
+This shift took root over a generation — it was not a decree but a gradual transformation. \
+In 3-4 sentences, chronicle how this changed the community permanently. How do the children \
+of this generation grow up differently than their parents? What old ways were abandoned? \
+What new assumptions do people carry without questioning?
 
 VOICE CONSTRAINT: Write as a witness to living history, not a game commentator. Do NOT mention \
 tokens, victory points, unlocks, purchases, upgrades, levels, or any game mechanics. \
@@ -276,13 +284,12 @@ SETTLEMENT STATE:
 
 {source_block}
 
-Write 2-3 sentences summarizing what the settlement's people accomplished this era. Write in past \
-tense, third-person omniscient — you are a historian looking back on events. Describe the collective \
-efforts: what was attempted, what bore fruit, and what fell short.
+A generation has passed. Write 3-4 sentences summarizing what the settlement's people accomplished \
+across these decades. Describe the work of a lifetime: what was built, what traditions took root, \
+how the landscape changed under sustained effort. What will this generation be remembered for?
 
-VOICE CONSTRAINT: Write as a historian recording real events. Do NOT mention tokens, rolls, victory \
-points, strategies, factions, phases, eras, or any game mechanics. No metagaming language. Ground \
-every observation in the lived reality of the settlers.
+VOICE CONSTRAINT: Write as a historian. No tokens, rolls, victory points, strategies, or game \
+mechanics. Ground every observation in the lived reality of generations.
 """
         return self._call_llm(prompt, round_num, "strategy_summary", max_tokens=256)
 
