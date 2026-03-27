@@ -682,7 +682,7 @@ class Arbiter:
                     figure.update({"faction": fname, "era": state.era, "role": "reformer", "status": "legendary"})
                     state.add_historical_figure(figure)
                     self._vprint(f"      [Historical figure: {figure['name']} — {figure['deed']}]")
-                    self._logger.log_event("historical_figure", era=state.era, **figure)
+                    self._logger.log_event("historical_figure", **figure)
 
                 new_strat = f"{cat}_strategy"
                 new_make = f"{cat}_make"
@@ -1584,7 +1584,7 @@ class Arbiter:
                 figure.update({"faction": leading_name, "era": state.era, "role": "crisis_leader", "status": status})
                 state.add_historical_figure(figure)
                 self._vprint(f"    [Historical figure: {figure['name']} — {figure['deed']}]")
-                self._logger.log_event("historical_figure", era=state.era, **figure)
+                self._logger.log_event("historical_figure", **figure)
 
         # ── Step 5: GM narrates the boon(s) if success ─────────────────────────
         if success and boons:
