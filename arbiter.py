@@ -12,9 +12,9 @@ from mechanics.strategies import (
     BASE_STRATEGIES, award_tokens,
     apply_make_exchange, BASE_MAKE_OPTIONS,
     CULTURE_STRATEGY_COLOR,
-    CHALLENGE_CATEGORIES,
     roll_strategy_dice, resolve_strategy_rolls, make_receive_for_level,
 )
+from mechanics.worldbuilding import CHALLENGE_EVENTS
 from mechanics.cultures import CULTURE_TREE
 from mechanics.scoring import score_all_factions
 from mechanics.ideologies import IDEOLOGIES
@@ -1036,16 +1036,30 @@ class Arbiter:
         # Track leader before challenge for reconsideration trigger in end-of-era
         self._leader_before_challenge = state.leading_faction
 
-        # Draw challenge category
-        cat = random.choice(CHALLENGE_CATEGORIES)
-        challenge_text = f"{cat['category']}: {cat['description']}"
-        state.set_challenge(challenge_text)
+        # Draw challenge event and have GM localize it
+        challenge_event = random.choice(CHALLENGE_EVENTS)
         difficulty = state.challenge_difficulty
-        print(f"    Challenge: [{cat['category']}] {cat['description']}")
+        print(f"    Challenge event: {challenge_event}")
         print(f"    Difficulty: {difficulty}")
+
+        # GM narrates the challenge with regional specifics
+        print(f"\n    → GM describing the challenge...", end="", flush=True)
+        gm_challenge = self._gm.narrate_challenge(
+            context={},
+            round_num=state.era,
+            challenge_text=challenge_event,
+            state_summary=state.summary(),
+        )
+        print(" done.\n")
+        challenge_text = gm_challenge.content
+        print(challenge_text)
+        self._logger.log(gm_challenge)
+        outputs.append(gm_challenge.to_dict())
+
+        state.set_challenge(challenge_text)
         self._logger.log_event("challenge_drawn", era=state.era,
-            category=cat["category"], description=cat["description"],
-            difficulty=difficulty, leader=leading_name)
+            event=challenge_event, difficulty=difficulty,
+            leader=state.leading_faction)
 
         leading_name = state.leading_faction
         leader_faction = state.get_faction(leading_name)

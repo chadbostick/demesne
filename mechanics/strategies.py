@@ -125,13 +125,6 @@ STRATEGIC_STANCES: dict = {
     "make":             {"description": "Exchange tokens to build something physical"},
 }
 
-# Challenge categories — easily extensible to hundreds of entries
-CHALLENGE_CATEGORIES: list = [
-    {"category": "Envoy Arrives",   "description": "A powerful visitor arrives with demands, offers, or secrets."},
-    {"category": "Weather Event",   "description": "A severe weather phenomenon threatens the settlement."},
-    {"category": "Magical Malady",  "description": "A mysterious magical affliction descends on the settlement."},
-    {"category": "Monsters Attack", "description": "Hostile creatures threaten the settlement's people or resources."},
-]
 
 
 def award_tokens(

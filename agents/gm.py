@@ -27,15 +27,19 @@ You are the chronicler of a fantasy settlement. You record history as it unfolds
 SETTLEMENT STATE:
 {state_summary}
 
-A CHALLENGE has befallen the settlement this era:
-{challenge_text}
+A CHALLENGE EVENT has been drawn: "{challenge_text}"
 
-In 2-4 sentences, narrate this challenge in vivid, grounded prose. Set the stakes. Describe what
-is at risk for the people of this settlement. Do not resolve the challenge yet — only introduce it.
+Make this specific to THIS settlement. Consider the geography, terrain, established cultures, \
+existing structures, and the people who live here. If the event seems impossible for this region \
+(e.g. "Tsunami" in a desert), interpret it as a metaphor or find a creative way it manifests \
+here — perhaps a sand tsunami, a wave of locusts, or a flood of refugees.
 
-VOICE CONSTRAINT: Write as a witness to real events. Do NOT mention tokens, rolls, victory points,
-game mechanics, or faction names as organizational labels. Refer to factions by their character and
-ideology, not as "factions." No metagaming language of any kind.
+In 2-4 sentences, narrate this challenge in vivid, grounded prose. Add unique details: names of \
+places, descriptions of what people see, specific consequences. Set the stakes. Do not resolve \
+the challenge yet — only introduce it.
+
+VOICE CONSTRAINT: Write as a witness to real events. Do NOT mention tokens, rolls, victory points, \
+game mechanics, or faction names as organizational labels. No metagaming language.
 """
         return self._call_llm(prompt, round_num, "challenge_narration")
 
