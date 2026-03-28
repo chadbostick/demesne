@@ -144,7 +144,10 @@ class Arbiter:
             tokens = dict(faction["tokens"])
 
             # ── Decide strategy ────────────────────────────────────────────
-            # 1. Check if make exchange enables a goal purchase (skip roll)
+            # 1. Pick target goal (determines which purchase we're working toward)
+            strategy, color, pursuit_reason = self._pick_best_strategy(faction, state)
+
+            # 2. Check if make exchange enables that goal's next purchase
             make_override = self._should_make_instead(faction, state)
             if make_override:
                 stance = "make"
@@ -155,8 +158,6 @@ class Arbiter:
                 faction["needs_reconsideration"] = False
                 self._vprint(f"    [{fname} → MAKE: {make_override['reason']}]")
             else:
-                # 2. Smart goal pursuit: pick the strategy that covers the biggest shortfall
-                strategy, color, pursuit_reason = self._pick_best_strategy(faction, state)
                 stance = f"pursuing_{color}"
                 _make_receive_color = None
                 _make_give = None
@@ -586,11 +587,10 @@ class Arbiter:
         Check if the faction should override to a make exchange.
         Returns {"reason", "exchange_color", "receive_color", "give"} or None.
 
-        Rules:
-        - Reserve tokens needed for the NEXT purchasable level of each goal
-          category (not the entire remaining path — that's unreachable)
-        - Exchange tokens that exceed what's needed for all next-level purchases
-        - Only exchange enough to cover the immediate shortfall
+        Only reserves tokens needed for the SINGLE most achievable goal's
+        next level — not all goals combined. A faction pursuing production L3
+        that also needs values L2 and property L1 only reserves for whichever
+        is closest, leaving the rest available for exchange.
         """
         tokens = dict(faction["tokens"])
         goals = faction.get("goals", {})
@@ -607,9 +607,6 @@ class Arbiter:
         t = goals.get("tertiary", {})
         if t.get("category"):
             target_cats.append((t["category"], f"tertiary goal ({t['category']})"))
-
-        # Compute tokens needed for NEXT level of each goal category
-        next_needs = self._next_level_needs(faction, state)
 
         for cat, reason in target_cats:
             cat_data = cultures.get(cat, {})
@@ -638,8 +635,8 @@ class Arbiter:
                     if have < 1:
                         continue
 
-                    # Reserve what's needed for next-level purchases across all goals
-                    reserved = next_needs.get(surplus_color, 0)
+                    # Only reserve what THIS purchase needs of this color
+                    reserved = cost.get(surplus_color, 0)
                     exchangeable = have - reserved
                     if exchangeable < 1:
                         continue
