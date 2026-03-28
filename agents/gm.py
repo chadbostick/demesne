@@ -60,12 +60,14 @@ Consider HOW this crisis connects to what came before. Is it:
   or reject the warnings?)
 
 The best history reads like inevitability in hindsight. The settlement's ESTABLISHED CULTURES \
-(listed in state above) determine how the crisis manifests and what's at stake. A crisis \
-hitting a Banking/Raiding society threatens different things than one hitting a Farming/Cautious \
-society. The most influential faction's worldview shapes how the people perceive the threat.
+(listed in state above) determine what's at stake — the crisis threatens what the community \
+HAS BECOME, not what any faction wishes it were. Cultures at L0 are absent from the community \
+identity and should not shape how the settlement-at-large perceives the threat. Individual \
+faction leaders may react from personal ideology, but the collective responds through its \
+locked-in cultures.
 
 In 3-5 sentences, chronicle what befell the people. Name specific places and historical \
-figures. Set the stakes in terms of what the settlement's identity could LOSE.
+figures. Set the stakes in terms of what the settlement's established identity could LOSE.
 
 VOICE CONSTRAINT: Write as a historian looking back across decades or centuries. No tokens, \
 rolls, victory points, or game mechanics.
@@ -111,13 +113,13 @@ OUTCOME: The settlement {outcome_word}.
 This crisis defined an age. Write 3-5 sentences describing what happened over the decades \
 or centuries it took to resolve.
 
-Connect the outcome to the settlement's established cultures:
-- If they PREVAILED: Show how their cultural identity (listed in state above) was the \
-  source of their strength. A settlement with Raiding fights back. One with Banking buys \
-  its way out. One with Meritocracy rallies its best. The response MUST reflect who they \
-  ARE, not generic humility or restraint.
-- If they FAILED: Show how their cultural blind spots caused the failure. But they don't \
+Connect the outcome to the settlement's ESTABLISHED cultures (not aspirational ones):
+- If they PREVAILED: Show how their locked-in cultural identity was the source of their \
+  strength. The community's response reflects who the MAJORITY are, not any single faction.
+- If they FAILED: Show how their cultural blind spots caused the failure. They don't \
   abandon their identity — they double down, adapt it, or discover its limits.
+- Cultures at L0 are NOT part of the community's response. Individual faction leaders \
+  may act from personal ideology, but the settlement responds through its established culture.
 
 Name the individual most associated with this crisis. End with:
 
@@ -271,15 +273,16 @@ Describe what changed permanently. Reference named historical figures.
 
 Then describe what a traveler would experience arriving NOW — 3-4 vivid sensory sentences.
 
-CRITICAL: The established cultures listed in the state above MUST be visible in the traveler's \
-experience. A settlement with Banking has counting houses and credit markets. One with Raiding \
-has armories and returning war parties. Meritocracy means competitive trials and earned honors. \
-Fire affinity means forges and smoke. The most influential faction's ideology should dominate \
-the settlement's character. A city-state stage should feel like a CAPITAL — grand, powerful, \
-bustling — not a declining village. The settlement grows MORE of what it is, not less.
-
-Do NOT narrate the settlement as humble, retreating, or learning restraint UNLESS the cultures \
-actually support that (e.g., Cautious mindset, Nature spirituality). Let the cultures speak.
+CRITICAL NARRATION RULES:
+- ESTABLISHED CULTURES define what the traveler sees. They are the lived reality of the \
+  majority — not aspirations, not one faction's perspective. Every locked-in culture should \
+  be visible in the settlement's architecture, economy, people, and daily life.
+- Cultures at L0 are ABSENT from the community's identity. Individual factions may practice \
+  them privately, but the settlement as a whole does not embody them.
+- Write as a faction-agnostic chronicler. The settlement's character comes from its cultures, \
+  not from any single faction's ideology or aspiration.
+- A city-state stage should feel like a CAPITAL. The settlement grows MORE of what it is.
+- Do NOT narrate the settlement as humble or retreating UNLESS its cultures support that.
 
 VOICE CONSTRAINT: No tokens, rolls, victory points, or game mechanics. No words like \
 "faction," "phase," "era," "points," or "unlocked."
@@ -345,16 +348,18 @@ Write a short chronicle of this age. For each faction, write 2-3 sentences in th
 describing what they accomplished. Then end with 1-2 sentences about what the settlement \
 achieved and what remains fragile.
 
-CRITICAL: The settlement's ESTABLISHED CULTURES (listed in the state above) are not abstract \
-labels — they define how people actually live. If the settlement has Banking, describe financial \
-institutions and credit markets. If it has Raiding, describe military expeditions and plunder. \
-If it has Meritocracy, describe competitive excellence and earned status. If it has Fire \
-affinity, describe forges and industry. The most influential factions' ideologies should \
-dominate the tone — a settlement led by a Conqueror feels different than one led by a Mystic.
-
-Do NOT narrate against the cultures. A settlement with Raiding does not become pacifist. A \
-settlement with Banking does not abandon commerce. Crises may test cultures but the cultures \
-themselves define the response — they raid harder, bank smarter, compete more fiercely.
+CRITICAL NARRATION RULES:
+- ESTABLISHED CULTURES (listed in the state) define the community at large. They are not \
+  aspirations or tendencies — they are the lived reality of the MAJORITY of people. Every \
+  established culture should be visible in how the settlement looks, sounds, and functions.
+- Cultures NOT yet established (L0) may appear as individual faction behavior or personal \
+  belief, but NOT as a defining trait of the community. A faction may aspire to mysticism, \
+  but if spirituality is L0, the settlement itself is not mystical.
+- Write as a faction-agnostic chronicler describing the community at large. Individual \
+  factions may have distinct voices, but the settlement's character comes from its \
+  LOCKED-IN cultures, not from any single faction's ideology.
+- Do NOT narrate against established cultures. Crises test them but the cultures define \
+  the response — the settlement doubles down on what it IS, not retreats from it.
 
 End with a hint of what's unresolved or fragile.
 

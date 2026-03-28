@@ -352,15 +352,21 @@ class SettlementState:
                 established.append(f"  {opt} ({cat}): {meaning}")
 
         if established:
-            lines.append("THE SETTLEMENT'S IDENTITY (these define how people live — narrate accordingly):")
+            lines.append("ESTABLISHED CULTURES (locked in — the MAJORITY lives this way, narrate as community identity):")
             lines.extend(established)
         else:
-            lines.append("THE SETTLEMENT HAS NO ESTABLISHED CULTURE YET — scattered camps with competing visions.")
+            lines.append("NO ESTABLISHED CULTURE YET — scattered camps with competing visions.")
 
-        # Factions by influence (who shapes the narrative)
+        # List what's absent
+        absent = [cat for cat, data in self._data["cultures"].items() if data["level"] == 0]
+        if absent:
+            lines.append(f"\nNOT YET PART OF COMMUNITY IDENTITY (L0 — individual factions may aspire to these, "
+                         f"but the settlement does not embody them): {', '.join(absent)}")
+
+        # Factions by influence
         factions = sorted(self._data["factions"], key=lambda f: f.get("influence", 0), reverse=True)
         if factions:
-            lines.append("\nFACTIONS BY INFLUENCE (most powerful first — their ideology shapes the world):")
+            lines.append("\nFACTIONS BY INFLUENCE (for individual perspective, not community identity):")
             for f in factions:
                 ideology = f.get("ideology", "?")
                 inf = f.get("influence", 0)
