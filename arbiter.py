@@ -366,17 +366,13 @@ class Arbiter:
         self, faction: dict, state: "SettlementState"
     ) -> tuple[str, str, str]:
         """
-        Smart goal pursuit with coalition awareness.
+        Smart goal pursuit with coalition awareness and sticky targeting.
 
         Returns (strategy_name, color, reason).
 
-        Logic:
-        1. Recompute goal costs based on current culture state
-        2. For each goal, compute the next level's shortfall per color
-        3. Apply coalition bonus: if allies exist for this category,
-           reduce effective shortfall (allies will contribute tokens)
-        4. Pick the goal with lowest effective shortfall
-        5. Earn the color with the biggest gap for that goal
+        Sticky behavior: once a faction starts pursuing a color, they stay
+        on it until the shortfall is covered, unless a dramatically better
+        opportunity emerges (>3 tokens closer).
         """
         from main import compute_goal_costs
         tokens = dict(faction["tokens"])
@@ -391,11 +387,8 @@ class Arbiter:
 
         color_to_strat = {v["token_color"]: k for k, v in BASE_STRATEGIES.items()}
 
-        best_goal = None
-        best_delta = float("inf")
-        best_shortfall_color = None
-        best_reason = ""
-
+        # Evaluate all goals
+        candidates: list[dict] = []
         for goal_key in ["primary", "secondary_0", "secondary_1", "tertiary"]:
             goal_data = goal_costs.get(goal_key)
             if not goal_data or not goal_data.get("remaining_levels"):
@@ -409,64 +402,93 @@ class Arbiter:
                 continue
             cost = get_cost(cat, next_lvl)
 
-            # Compute total shortfall
+            # Compute per-color shortfalls
+            shortfalls: dict[str, int] = {}
             total_short = 0
-            worst_color = None
-            worst_short = 0
             for c, needed in cost.items():
                 have = tokens.get(c, 0)
                 short = max(0, needed - have)
                 total_short += short
-                if short > worst_short:
-                    worst_short = short
-                    worst_color = c
+                if short > 0:
+                    shortfalls[c] = short
 
             if total_short == 0:
                 continue
 
-            # Coalition bonus: if allies exist, they'll contribute tokens
-            # in cooperative purchase, so our effective shortfall is lower
+            # Coalition bonus
             effective_short = total_short
             coalition = coalition_cats.get(cat)
             if coalition:
                 num_allies = len(coalition["allies"])
-                # Estimate: each ally contributes ~1-2 tokens per era toward this category
-                # So coalition categories are effectively cheaper
-                coalition_discount = min(total_short - 1, num_allies)  # can't discount to 0
+                coalition_discount = min(total_short - 1, num_allies)
                 effective_short = max(1, total_short - coalition_discount)
                 suffix = f" (coalition: {num_allies} allies)"
             else:
                 suffix = " (solo)"
 
-            if effective_short < best_delta:
-                best_delta = effective_short
-                best_goal = goal_key
-                best_shortfall_color = worst_color
-                best_reason = f"{goal_key}: {cat} L{next_lvl} needs {total_short} tokens, effective={effective_short}{suffix}"
+            # Pick the color with the biggest shortfall for this goal
+            worst_color = max(shortfalls, key=shortfalls.get) if shortfalls else None
+            if worst_color:
+                candidates.append({
+                    "goal_key": goal_key,
+                    "category": cat,
+                    "level": next_lvl,
+                    "color": worst_color,
+                    "shortfall": shortfalls[worst_color],
+                    "total_short": total_short,
+                    "effective_short": effective_short,
+                    "suffix": suffix,
+                })
 
-        if best_shortfall_color and best_shortfall_color in color_to_strat:
-            strategy = color_to_strat[best_shortfall_color]
-            return strategy, best_shortfall_color, best_reason
+        if not candidates:
+            # Fallback
+            aggregate = goal_costs.get("aggregate", {})
+            if aggregate:
+                biggest_gap_color = max(
+                    aggregate.keys(),
+                    key=lambda c: max(0, aggregate[c] - tokens.get(c, 0))
+                )
+                if biggest_gap_color in color_to_strat:
+                    return color_to_strat[biggest_gap_color], biggest_gap_color, "aggregate need"
+            return "pray", "red", "fallback"
 
-        # Fallback: prioritize coalition categories from priority_order
-        priority_order = coalition_plan.get("priority_order", [])
-        aggregate = goal_costs.get("aggregate", {})
-        if priority_order and aggregate:
-            for cat in priority_order:
-                color = CULTURE_STRATEGY_COLOR.get(cat)
-                if color and aggregate.get(color, 0) > tokens.get(color, 0):
-                    if color in color_to_strat:
-                        return color_to_strat[color], color, f"coalition priority: {cat}"
+        # Sort by effective shortfall (closest goal first)
+        candidates.sort(key=lambda c: c["effective_short"])
+        best = candidates[0]
 
-        if aggregate:
-            biggest_gap_color = max(
-                aggregate.keys(),
-                key=lambda c: max(0, aggregate[c] - tokens.get(c, 0))
+        # Sticky targeting: if faction was pursuing a color last era,
+        # stay on it unless the best candidate is dramatically better
+        current_pursuit = faction.get("_current_pursuit", {})
+        current_color = current_pursuit.get("color")
+        current_goal = current_pursuit.get("goal_key")
+
+        if current_color and current_color in color_to_strat:
+            # Find the current pursuit in candidates
+            current_candidate = next(
+                (c for c in candidates if c["color"] == current_color), None
             )
-            if biggest_gap_color in color_to_strat:
-                return color_to_strat[biggest_gap_color], biggest_gap_color, f"aggregate need: {biggest_gap_color}"
+            if current_candidate:
+                # Stay on current unless best is >3 tokens closer
+                improvement = current_candidate["effective_short"] - best["effective_short"]
+                if improvement <= 3:
+                    # Stick with current
+                    faction["_current_pursuit"] = {"color": current_color, "goal_key": current_candidate["goal_key"]}
+                    strategy = color_to_strat[current_color]
+                    reason = (
+                        f"{current_candidate['goal_key']}: {current_candidate['category']} "
+                        f"L{current_candidate['level']} short {current_candidate['total_short']}"
+                        f"{current_candidate['suffix']} [STAYING COURSE]"
+                    )
+                    return strategy, current_color, reason
 
-        return "pray", "red", "fallback"
+        # Switch to best target
+        faction["_current_pursuit"] = {"color": best["color"], "goal_key": best["goal_key"]}
+        strategy = color_to_strat.get(best["color"], "pray")
+        reason = (
+            f"{best['goal_key']}: {best['category']} L{best['level']} "
+            f"short {best['total_short']}{best['suffix']}"
+        )
+        return strategy, best["color"], reason
 
     def _pick_bonus_colors(
         self, faction: dict, tokens: dict, base_color: str,
