@@ -59,12 +59,13 @@ Consider HOW this crisis connects to what came before. Is it:
 - A FORETOLD reckoning? (Signs were there — did the people prepare, ignore them, \
   or reject the warnings?)
 
-The best history reads like inevitability in hindsight. Plant the seeds: reference specific \
-decisions, structures, or cultural shifts from earlier that made this crisis hit harder — or \
-that gave the people tools they didn't know they'd need.
+The best history reads like inevitability in hindsight. The settlement's ESTABLISHED CULTURES \
+(listed in state above) determine how the crisis manifests and what's at stake. A crisis \
+hitting a Banking/Raiding society threatens different things than one hitting a Farming/Cautious \
+society. The most influential faction's worldview shapes how the people perceive the threat.
 
 In 3-5 sentences, chronicle what befell the people. Name specific places and historical \
-figures. Set the stakes in generational terms. Do not resolve the crisis yet.
+figures. Set the stakes in terms of what the settlement's identity could LOSE.
 
 VOICE CONSTRAINT: Write as a historian looking back across decades or centuries. No tokens, \
 rolls, victory points, or game mechanics.
@@ -110,15 +111,15 @@ OUTCOME: The settlement {outcome_word}.
 This crisis defined an age. Write 3-5 sentences describing what happened over the decades \
 or centuries it took to resolve.
 
-Connect the outcome to the settlement's larger arc:
-- If they PREVAILED: What earlier choices, structures, or cultural values gave them the \
-  strength to endure? What scars remain alongside the triumph? What new vulnerability has \
-  their success created? (Every victory plants the seeds of a future crisis.)
-- If they FAILED: What weakness was exposed — was it structural, cultural, or leadership? \
-  What was permanently lost? What desperate adaptation will define the next generation?
+Connect the outcome to the settlement's established cultures:
+- If they PREVAILED: Show how their cultural identity (listed in state above) was the \
+  source of their strength. A settlement with Raiding fights back. One with Banking buys \
+  its way out. One with Meritocracy rallies its best. The response MUST reflect who they \
+  ARE, not generic humility or restraint.
+- If they FAILED: Show how their cultural blind spots caused the failure. But they don't \
+  abandon their identity — they double down, adapt it, or discover its limits.
 
-Reference specific named historical figures, structures, and places. Name the individual \
-most associated with this crisis. End with their name and deed:
+Name the individual most associated with this crisis. End with:
 
 HISTORICAL FIGURE: [name] — [one sentence deed]
 
@@ -265,20 +266,23 @@ CHALLENGE OUTCOME:
 
 Decades or centuries have passed. Write TWO sections:
 
-First, close this historical period in 4-6 sentences. Describe what changed permanently: which \
-communities rose, which declined, what the children of this generation will inherit. Name this \
-period something NEW and DIFFERENT from previous periods. Reference any named historical figures.
+First, close this historical period in 4-6 sentences. Name this period something NEW. \
+Describe what changed permanently. Reference named historical figures.
 
-Then, seamlessly transition to describing the settlement as it stands now — what a traveler \
-would experience arriving at this moment. In 3-4 sentences: what do they see first? What sounds \
-and smells reach them? What food is offered? What do the people wear, build, trade? Make it \
-vivid, sensory, and specific to the current stage of development. If it's scattered camps, \
-it should feel like frontier survival. If it's a city-state, it should feel like arriving \
-at a capital. Do NOT use section labels or headers — let it flow naturally from the chronicle.
+Then describe what a traveler would experience arriving NOW — 3-4 vivid sensory sentences.
 
-VOICE CONSTRAINT: Write as a historian closing a chapter. No tokens, rolls, victory points, \
-strategies, or game mechanics. No words like "faction," "phase," "era," "points," or "unlocked." \
-Refer to groups by their nature and character.
+CRITICAL: The established cultures listed in the state above MUST be visible in the traveler's \
+experience. A settlement with Banking has counting houses and credit markets. One with Raiding \
+has armories and returning war parties. Meritocracy means competitive trials and earned honors. \
+Fire affinity means forges and smoke. The most influential faction's ideology should dominate \
+the settlement's character. A city-state stage should feel like a CAPITAL — grand, powerful, \
+bustling — not a declining village. The settlement grows MORE of what it is, not less.
+
+Do NOT narrate the settlement as humble, retreating, or learning restraint UNLESS the cultures \
+actually support that (e.g., Cautious mindset, Nature spirituality). Let the cultures speak.
+
+VOICE CONSTRAINT: No tokens, rolls, victory points, or game mechanics. No words like \
+"faction," "phase," "era," "points," or "unlocked."
 """
         return self._call_llm(prompt, round_num, "end_of_era")
 
@@ -338,18 +342,23 @@ SETTLEMENT STATE:
 {source_block}
 
 Write a short chronicle of this age. For each faction, write 2-3 sentences in third person \
-describing what they accomplished across decades or centuries. Use their full name. Then end \
-with 1-2 sentences about what the settlement as a whole achieved and what remains fragile.
+describing what they accomplished. Then end with 1-2 sentences about what the settlement \
+achieved and what remains fragile.
 
-Write as a historian. Describe the work of generations: what was built, what traditions took root, \
-how the landscape changed under sustained effort.
+CRITICAL: The settlement's ESTABLISHED CULTURES (listed in the state above) are not abstract \
+labels — they define how people actually live. If the settlement has Banking, describe financial \
+institutions and credit markets. If it has Raiding, describe military expeditions and plunder. \
+If it has Meritocracy, describe competitive excellence and earned status. If it has Fire \
+affinity, describe forges and industry. The most influential factions' ideologies should \
+dominate the tone — a settlement led by a Conqueror feels different than one led by a Mystic.
 
-End with a hint of what's unresolved or fragile — something the people haven't noticed, \
-something they're neglecting, or a tension that's growing beneath the surface. The reader \
-should feel that prosperity and crisis are two sides of the same coin.
+Do NOT narrate against the cultures. A settlement with Raiding does not become pacifist. A \
+settlement with Banking does not abandon commerce. Crises may test cultures but the cultures \
+themselves define the response — they raid harder, bank smarter, compete more fiercely.
 
-VOICE CONSTRAINT: Write as a historian. No tokens, rolls, victory points, strategies, or game \
-mechanics. Ground every observation in the lived reality of generations.
+End with a hint of what's unresolved or fragile.
+
+VOICE CONSTRAINT: No tokens, rolls, victory points, or game mechanics.
 """
         return self._call_llm(prompt, round_num, "strategy_summary", max_tokens=1024)
 

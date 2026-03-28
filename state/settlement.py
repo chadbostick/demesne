@@ -281,6 +281,93 @@ class SettlementState:
     def to_json(self, indent: int = 2) -> str:
         return json.dumps(self._data, indent=indent)
 
+    def cultural_identity(self) -> str:
+        """
+        Describe the settlement's established cultures as lived reality,
+        with factions ranked by influence and their aspirations.
+        Used by GM to ground narration in what the settlement IS, not just
+        what happened to it.
+        """
+        # Established cultures as character traits
+        _CULTURE_MEANING = {
+            "Anarchy": "decentralized, no formal authority, self-governing",
+            "Authoritarian": "centralized command, obedience expected, strong rulers",
+            "Monarchy": "hereditary rule, royal court, noble dynasties",
+            "Republic": "elected representatives, civic participation, rule of law",
+            "Democracy": "direct popular governance, public debate, majority rule",
+            "Empire": "expansionist sovereign state, imperial bureaucracy, conquered territories",
+            "Personal": "individual property rights, private ownership, self-reliance",
+            "Communal": "shared resources, collective stewardship, mutual obligation",
+            "Barter": "direct trade, haggling, goods-for-goods exchange economy",
+            "Currency": "standardized money, minted coins, monetary valuation",
+            "Banking": "financial institutions, credit, investment, compound interest",
+            "Taxes": "state revenue collection, public treasury, redistributive authority",
+            "Ancestors": "reverence for the dead, ancestral wisdom, tradition-bound spirituality",
+            "Nature": "animistic worship, sacred groves, spiritual ecology",
+            "Monotheism": "single deity, organized clergy, doctrinal authority",
+            "Polytheism": "pantheon of gods, temples, diverse priesthoods",
+            "Science": "empirical method, secular inquiry, evidence over faith",
+            "Mysticism": "hidden truths, esoteric knowledge, transcendent experience",
+            "Impulsive": "act-first culture, boldness rewarded, risk-taking",
+            "Cautious": "deliberation before action, patience valued, risk-averse",
+            "Rational": "logic-driven decisions, debate culture, skepticism of emotion",
+            "Emotional": "passion-driven, empathy central, feelings guide action",
+            "Diplomatic": "negotiation as primary tool, coalition-building, compromise",
+            "Isolationist": "self-sufficient, closed borders, distrust of outsiders",
+            "Fraternal": "bonds of brotherhood, peer loyalty, egalitarian fellowship",
+            "Familial": "blood ties paramount, clan structure, inheritance-based",
+            "Tribal": "kinship groups, tribal councils, oral tradition",
+            "Hierarchical": "ranked society, stratified classes, authority by station",
+            "Class": "rigid social strata, aristocratic privilege, birth determines fate",
+            "Meritocracy": "advancement by ability, competitive excellence, earned status",
+            "Strength": "physical prowess valued, martial culture, might makes right",
+            "Knowledge": "learning valued, scholars respected, curiosity rewarded",
+            "Talent": "natural gifts celebrated, charisma and creativity prized",
+            "Skill": "craft mastery, technical expertise, demonstrated competence",
+            "Prestige": "reputation economy, social standing, honor and display",
+            "Power": "raw authority, dominance hierarchies, control as currency",
+            "Farming": "agricultural society, settled cultivation, seasonal rhythms",
+            "Hunting": "hunter culture, tracking, animal knowledge, frontier ethos",
+            "Raiding": "plunder economy, military expeditions, conquest for resources",
+            "Trading": "merchant culture, trade routes, commercial diplomacy",
+            "Manufacturing": "industrial production, factories, mass craft",
+            "Mining": "deep extraction, underground industry, mineral wealth",
+            "Earth": "stone-working, stability, endurance, geological awareness",
+            "Water": "waterways, navigation, fluid adaptation, aquatic resources",
+            "Air": "wind power, open skies, communication, movement of ideas",
+            "Fire": "forges, smelting, transformation through heat, industry",
+            "Light": "transparency, illumination, public knowledge, openness",
+            "Dark": "secrecy, hidden knowledge, shadow governance, subterfuge",
+        }
+
+        lines = []
+
+        # Established cultures as defining traits
+        established = []
+        for cat, data in self._data["cultures"].items():
+            if data["level"] == 0:
+                continue
+            for opt in data["options_chosen"]:
+                meaning = _CULTURE_MEANING.get(opt, opt.lower())
+                established.append(f"  {opt} ({cat}): {meaning}")
+
+        if established:
+            lines.append("THE SETTLEMENT'S IDENTITY (these define how people live — narrate accordingly):")
+            lines.extend(established)
+        else:
+            lines.append("THE SETTLEMENT HAS NO ESTABLISHED CULTURE YET — scattered camps with competing visions.")
+
+        # Factions by influence (who shapes the narrative)
+        factions = sorted(self._data["factions"], key=lambda f: f.get("influence", 0), reverse=True)
+        if factions:
+            lines.append("\nFACTIONS BY INFLUENCE (most powerful first — their ideology shapes the world):")
+            for f in factions:
+                ideology = f.get("ideology", "?")
+                inf = f.get("influence", 0)
+                lines.append(f"  {f['name']} ({ideology}, influence {inf})")
+
+        return "\n".join(lines)
+
     def culture_summary(self) -> str:
         lines = ["Culture levels:"]
         for cat, data in self._data["cultures"].items():
@@ -317,6 +404,7 @@ class SettlementState:
         ]
         if hist:
             lines.append(hist)
+        lines.append(self.cultural_identity())
         lines += [
             f"Strategies available: {', '.join(d['available_strategies'])}",
             f"Current challenge: {d['current_challenge'] or 'none'}",
