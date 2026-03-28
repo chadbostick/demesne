@@ -1,5 +1,7 @@
 # Faction Culture Preferences
 
+> **Status: IMPLEMENTED** (deterministic mode). LLM mode deferred. See `mechanics/culture_preferences.py` for the 768 preference labels across 16 ideologies, and `agents/faction.py` for `_culture_preferences_block()` integration into strategy and investment prompts.
+
 ## Problem
 
 Factions targeting L3 goals need L1 and L2 prerequisites unlocked first, but currently have no opinion about *which* option at each prerequisite level they prefer. This flattens storytelling — a Progressionist chasing Democracy should prefer Anarchy over Authoritarian at L1, Republic over Monarchy at L2. Factions should pursue options that fit their ideology, even when either option would satisfy the mechanical prerequisite.
