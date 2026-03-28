@@ -1193,19 +1193,30 @@ class Arbiter:
                 for f in state.factions:
                     tok_str = ", ".join(f"{c}:{n}" for c, n in f["tokens"].items() if n > 0) or "none"
                     benefits = self._faction_benefits_from(f, cat)
-                    if benefits:
-                        # Check if their contribution is less than what they'd pay solo
-                        f_contribution = sum(
-                            min(f["tokens"].get(c, 0), n) for c, n in cost.items()
-                        )
-                        solo_cost = sum(cost.values())
-                        if f_contribution <= solo_cost:
-                            status = f"willing (contributes {f_contribution}/{solo_cost})"
-                            willing_factions.append(f)
-                        else:
-                            status = "unwilling (cheaper solo)"
-                    else:
+                    if not benefits:
                         status = "unwilling (not their goal)"
+                        self._vprint(f"      {f['name']}: [{tok_str}] — {status}")
+                        continue
+
+                    # Check culture preference for this specific option
+                    prefs = f.get("culture_preferences", {}).get(cat, {}).get(lvl, {})
+                    option_pref = prefs.get(option, "indifferent")
+                    if option_pref == "antithesis":
+                        status = f"REFUSES (antithesis to {option})"
+                        self._vprint(f"      {f['name']}: [{tok_str}] — {status}")
+                        continue
+
+                    # Check if their contribution is less than what they'd pay solo
+                    f_contribution = sum(
+                        min(f["tokens"].get(c, 0), n) for c, n in cost.items()
+                    )
+                    solo_cost = sum(cost.values())
+                    if f_contribution <= solo_cost:
+                        pref_label = f", pref={option_pref}" if option_pref != "indifferent" else ""
+                        status = f"willing (contributes {f_contribution}/{solo_cost}{pref_label})"
+                        willing_factions.append(f)
+                    else:
+                        status = "unwilling (cheaper solo)"
                     self._vprint(f"      {f['name']}: [{tok_str}] — {status}")
 
                 if not willing_factions:
@@ -1291,7 +1302,9 @@ class Arbiter:
         return made_any
 
     def _cooperative_upgrades(self, factions: list[dict], cultures: dict) -> list[dict]:
-        """Return upgrades that willing factions can afford together but not alone."""
+        """Return upgrades that willing factions can afford together but not alone.
+        Factions with antithesis preference for a specific option are excluded from
+        that option's pool (they won't fund something they oppose)."""
         coop = []
         for cat, cat_data in cultures.items():
             next_lvl = cat_data["level"] + 1
@@ -1302,22 +1315,30 @@ class Arbiter:
             cost = get_cost(cat, next_lvl)
 
             # Only consider factions that benefit from this category
-            willing = [f for f in factions if self._faction_benefits_from(f, cat)]
-            if not willing:
+            cat_willing = [f for f in factions if self._faction_benefits_from(f, cat)]
+            if not cat_willing:
                 continue
 
-            # Sum willing factions' tokens
-            willing_combined: dict = {}
-            for f in willing:
-                for c, n in f["tokens"].items():
-                    willing_combined[c] = willing_combined.get(c, 0) + n
-
-            # Affordable by willing factions combined, not by any single one
-            if not self._can_afford(willing_combined, cost):
-                continue
-            if any(self._can_afford(dict(f["tokens"]), cost) for f in willing):
-                continue
             for opt in CULTURE_TREE[cat]["levels"][next_lvl]["options"]:
+                # Further filter: exclude factions whose preference is antithesis
+                willing = [
+                    f for f in cat_willing
+                    if f.get("culture_preferences", {}).get(cat, {}).get(next_lvl, {}).get(opt, "indifferent") != "antithesis"
+                ]
+                if not willing:
+                    continue
+
+                # Sum willing factions' tokens
+                willing_combined: dict = {}
+                for f in willing:
+                    for c, n in f["tokens"].items():
+                        willing_combined[c] = willing_combined.get(c, 0) + n
+
+                # Affordable by willing factions combined, not by any single one
+                if not self._can_afford(willing_combined, cost):
+                    continue
+                if any(self._can_afford(dict(f["tokens"]), cost) for f in willing):
+                    continue
                 coop.append({"category": cat, "level": next_lvl, "option": opt, "cost": cost})
         return coop
 
