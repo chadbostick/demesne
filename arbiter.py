@@ -198,7 +198,7 @@ class Arbiter:
 
                         self._logger.log_event("make_exchange", era=state.era,
                             faction=fname, give_color=color, give_amount=give,
-                            receive_color=receive_color, receive_amount=receive,
+                            receive_colors=dict(Counter(receive_colors)), receive_amount=receive,
                             tokens_after=dict(tokens), influence=faction.get("influence", 0))
 
                         # LLM describes the structure
