@@ -632,16 +632,20 @@ class Arbiter:
                         continue
 
                     have = tokens.get(surplus_color, 0)
-                    if have < 1:
-                        continue
 
                     # Only reserve what THIS purchase needs of this color
                     reserved = cost.get(surplus_color, 0)
                     exchangeable = have - reserved
-                    if exchangeable < 1:
+
+                    # Only make when there's genuine excess — more tokens of this
+                    # color than the faction needs. A single spare token should be
+                    # accumulated via rolling, not immediately converted.
+                    # Threshold: at least 3 tokens excess, or at least 2 at L1+ multiplier
+                    color_level = state.get_color_level(surplus_color)
+                    min_excess = 2 if color_level >= 1 else 3
+                    if exchangeable < min_excess:
                         continue
 
-                    color_level = state.get_color_level(surplus_color)
                     multiplier = color_level + 1
 
                     min_give = (short_amount + multiplier - 1) // multiplier
