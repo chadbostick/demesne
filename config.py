@@ -25,8 +25,11 @@ CULTURE_PREFERENCE_MODE = "deterministic"
 MIN_FACTIONS = 2
 MAX_FACTIONS = 5
 
-# Dynamic faction addition: None | "perEra" | "perSuccess" | "perLevel"
-ADD_FACTIONS_MODE = None
+# Dynamic faction addition (set of modes, can combine)
+ADD_FACTIONS_MODES: set = set()
+
+# Dynamic faction removal (set of modes, can combine)
+REMOVE_FACTIONS_MODES: set = set()
 
 # Display modes (overridden by CLI flags)
 VERBOSE = False       # show metagame info (tokens, dice, decision trees)

@@ -485,15 +485,20 @@ def main() -> None:
         help="Pause at every phase (default: only end of era)"
     )
     parser.add_argument(
-        "--addFactions", choices=["perEra", "perSuccess", "perLevel"], default=None,
-        help="Add new factions dynamically (perEra|perSuccess|perLevel)"
+        "--addFactions", nargs="+", choices=["perEra", "perSuccess", "perLevel"], default=[],
+        help="Add new factions dynamically (can combine: perEra perSuccess perLevel)"
+    )
+    parser.add_argument(
+        "--removeFactions", nargs="+", choices=["noInfluence", "perFail", "perLeaderChange", "perLevel"], default=[],
+        help="Remove factions dynamically (can combine: noInfluence perFail perLeaderChange perLevel)"
     )
     args = parser.parse_args()
 
     # Set global display modes
     config.VERBOSE = args.verbose
     config.ALL_PAUSES = args.pauses
-    config.ADD_FACTIONS_MODE = args.addFactions
+    config.ADD_FACTIONS_MODES = set(args.addFactions)
+    config.REMOVE_FACTIONS_MODES = set(args.removeFactions)
 
     if not config.ANTHROPIC_API_KEY:
         print("ERROR: ANTHROPIC_API_KEY is not set. Create a .env file or export the variable.")

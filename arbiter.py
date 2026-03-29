@@ -76,25 +76,139 @@ class Arbiter:
         self._previous_challenges: list[str] = []  # challenge events from past eras
 
     def _try_add_faction(self, state: "SettlementState", trigger: str, culture_level: int = 0) -> None:
-        """Attempt to add a new faction if the trigger matches the configured mode."""
-        if config.ADD_FACTIONS_MODE != trigger:
+        """Attempt to add a new faction if the trigger is in the configured modes."""
+        if trigger not in config.ADD_FACTIONS_MODES:
             return
         # perLevel: only trigger on FIRST time settlement reaches L1, L2, or L3
         if trigger == "perLevel":
-            milestones = state._data.setdefault("_level_milestones_triggered", set())
-            # Convert to set if loaded from JSON as list
-            if isinstance(milestones, list):
-                milestones = set(milestones)
-                state._data["_level_milestones_triggered"] = milestones
+            milestones = state._data.setdefault("_level_milestones_triggered", [])
             if culture_level in milestones or culture_level < 1:
                 return
-            milestones.add(culture_level)
-            # Store as list for JSON serialization
-            state._data["_level_milestones_triggered"] = list(milestones)
+            milestones.append(culture_level)
         ideology = state.pop_available_ideology()
         if not ideology:
             return
         self._add_new_faction(state, ideology)
+
+    def _try_remove_faction(
+        self, state: "SettlementState", trigger: str,
+        scapegoat_name: str | None = None,
+        beneficiaries: list[str] | None = None,
+        culture_level: int = 0,
+    ) -> None:
+        """Attempt to remove a faction based on the trigger mode."""
+        if trigger not in config.REMOVE_FACTIONS_MODES:
+            return
+        if len(state.factions) <= 2:
+            return  # never go below 2 factions
+
+        if trigger == "noInfluence":
+            # Remove all factions below 0 — tokens to faction needing colors most
+            eliminated = [f for f in state.factions if f.get("influence", 0) < 0]
+            for f in eliminated:
+                best_recipient = self._faction_needing_colors_most(state, f["tokens"], exclude=f["name"])
+                self._eliminate_and_redistribute(state, f["name"], best_recipient)
+
+        elif trigger == "perFail":
+            if not scapegoat_name:
+                return
+            # Tokens go to factions that did NOT contribute (beneficiaries)
+            self._eliminate_and_redistribute(state, scapegoat_name, beneficiaries)
+
+        elif trigger == "perLeaderChange":
+            if not scapegoat_name:
+                return
+            # Tokens go to the new leader (beneficiaries[0])
+            recipient = beneficiaries[0] if beneficiaries else None
+            self._eliminate_and_redistribute(state, scapegoat_name, recipient)
+
+        elif trigger == "perLevel":
+            milestones = state._data.setdefault("_level_milestones_removed", [])
+            if culture_level in milestones or culture_level < 1:
+                return
+            milestones.append(culture_level)
+            # Weakest faction eliminated, tokens to the purchaser
+            weakest = min(state.factions, key=lambda f: f.get("influence", 0))
+            purchaser = beneficiaries[0] if beneficiaries else None
+            if weakest["name"] != purchaser:
+                self._eliminate_and_redistribute(state, weakest["name"], purchaser)
+
+    def _eliminate_and_redistribute(
+        self, state: "SettlementState", victim_name: str,
+        recipients: str | list[str] | None,
+    ) -> None:
+        """Remove a faction and redistribute their tokens."""
+        if len(state.factions) <= 2:
+            return
+        try:
+            victim = state.get_faction(victim_name)
+        except KeyError:
+            return
+        victim_tokens = dict(victim.get("tokens", {}))
+        total_tokens = sum(victim_tokens.values())
+
+        # Normalize recipients to a list
+        if isinstance(recipients, str):
+            recipients = [recipients]
+        if not recipients:
+            recipients = [f["name"] for f in state.factions if f["name"] != victim_name]
+        recipients = [r for r in recipients if r != victim_name]
+        if not recipients:
+            return
+
+        # Distribute tokens
+        if len(recipients) == 1:
+            # All tokens to single recipient
+            r = state.get_faction(recipients[0])
+            for c, n in victim_tokens.items():
+                r["tokens"][c] = r["tokens"].get(c, 0) + n
+            state.update_faction_tokens(recipients[0], r["tokens"])
+            self._vprint(f"    [{recipients[0]} absorbs {total_tokens} tokens from {victim_name}]")
+        else:
+            # Split evenly across recipients, remainder to first
+            per_recipient: dict[str, dict[str, int]] = {r: {} for r in recipients}
+            for c, n in victim_tokens.items():
+                if n <= 0:
+                    continue
+                share = n // len(recipients)
+                remainder = n % len(recipients)
+                for i, r in enumerate(recipients):
+                    amount = share + (1 if i < remainder else 0)
+                    if amount > 0:
+                        per_recipient[r][c] = amount
+            for r_name, r_tokens in per_recipient.items():
+                if r_tokens:
+                    f = state.get_faction(r_name)
+                    for c, n in r_tokens.items():
+                        f["tokens"][c] = f["tokens"].get(c, 0) + n
+                    state.update_faction_tokens(r_name, f["tokens"])
+            self._vprint(f"    [{victim_name}'s {total_tokens} tokens distributed to {', '.join(recipients)}]")
+
+        # Eliminate
+        print(f"\n    *** {victim_name} has been scattered — their people absorbed by the settlement ***")
+        state.eliminate_faction(victim_name)
+        self._factions = [a for a in self._factions if a.faction_data["name"] != victim_name]
+        self._logger.log_event("faction_eliminated", era=state.era, faction=victim_name,
+            trigger="removal", tokens_redistributed=victim_tokens, recipients=recipients)
+
+    def _faction_needing_colors_most(self, state: "SettlementState", tokens: dict, exclude: str = "") -> str:
+        """Find the faction with the largest total shortfall that could use these token colors."""
+        best_name = None
+        best_match = 0
+        for f in state.factions:
+            if f["name"] == exclude:
+                continue
+            # How many of the victim's tokens match this faction's shortfalls?
+            goal_costs = f.get("goal_costs", {})
+            aggregate = goal_costs.get("aggregate", {})
+            match = 0
+            for c, n in tokens.items():
+                need = max(0, aggregate.get(c, 0) - f["tokens"].get(c, 0))
+                match += min(n, need)
+            if match > best_match:
+                best_match = match
+                best_name = f["name"]
+        return best_name or (state.factions[0]["name"] if state.factions else "")
 
     def _add_new_faction(self, state: "SettlementState", ideology: str) -> None:
         """Add a new faction mid-game."""
@@ -935,6 +1049,7 @@ class Arbiter:
                     faction=fname, category=cat, level=lvl, option=option,
                     cost=cost, tokens_after=dict(tokens), cooperative=False)
                 self._try_add_faction(state, "perLevel", culture_level=lvl)
+                self._try_remove_faction(state, "perLevel", culture_level=lvl, beneficiaries=[fname])
 
                 new_strat = f"{cat}_strategy"
                 new_make = f"{cat}_make"
@@ -1380,6 +1495,9 @@ class Arbiter:
                 made_any = True
                 bought_one = True
                 self._try_add_faction(state, "perLevel", culture_level=lvl)
+                # perLevel removal: top contributor absorbs weakest
+                top_contrib = max(pool, key=lambda fn: sum(pool[fn].values())) if pool else None
+                self._try_remove_faction(state, "perLevel", culture_level=lvl, beneficiaries=[top_contrib] if top_contrib else None)
 
                 contribs = "; ".join(
                     f"{fn}: " + ", ".join(f"{n} {c}" for c, n in cols.items())
@@ -1827,13 +1945,31 @@ class Arbiter:
                     f["influence"] = f.get("influence", 0) + gain
                     self._vprint(f"    [Influence: {fname} +{gain} (d6, withheld) → {f['influence']}]")
 
-            # Check for faction elimination (influence < 0)
-            eliminated = [f["name"] for f in state.factions if f.get("influence", 0) < 0]
-            for elim_name in eliminated:
-                print(f"\n    *** {elim_name} has been scattered — their influence has collapsed ***")
-                state.eliminate_faction(elim_name)
-                self._factions = [a for a in self._factions if a.faction_data["name"] != elim_name]
-                self._logger.log_event("faction_eliminated", era=state.era, faction=elim_name)
+            # Check for faction elimination
+            # noInfluence: any faction below 0
+            self._try_remove_faction(state, "noInfluence")
+
+            # perFail: scapegoat = biggest contributor to the failed challenge
+            if contributing_factions:
+                # Find who contributed most tokens
+                contributor_totals = {}
+                for part in donation_parts:
+                    for f in state.factions:
+                        if f["name"] in part and ": 0" not in part:
+                            # Extract donation amount from the string
+                            import re as _re
+                            match = _re.search(r": (\d+)", part)
+                            if match and f["name"] in part:
+                                contributor_totals[f["name"]] = contributor_totals.get(f["name"], 0) + int(match.group(1))
+                if contributor_totals:
+                    scapegoat = max(contributor_totals, key=contributor_totals.get)
+                else:
+                    scapegoat = leading_name
+                non_contributors = [f["name"] for f in state.factions
+                                    if f["name"] not in contributing_factions and f["name"] != scapegoat]
+                self._try_remove_faction(state, "perFail",
+                    scapegoat_name=scapegoat,
+                    beneficiaries=non_contributors if non_contributors else None)
 
             # New leader = highest influence
             if state.factions:
@@ -1854,8 +1990,13 @@ class Arbiter:
                 inf_display = ", ".join(f"{n}({state.get_faction(n)['influence']})" for n in new_order)
                 self._vprint(f"    [Influence order: {inf_display}]")
                 self._logger.log_event("leadership_shift", era=state.era,
-                    new_leader=new_leader, influence_order={n: state.get_faction(n)["influence"] for n in new_order},
-                    eliminated=eliminated)
+                    new_leader=new_leader, influence_order={n: state.get_faction(n)["influence"] for n in new_order})
+
+                # perLeaderChange: outgoing leader eliminated, tokens to new leader
+                if new_leader != leading_name:
+                    self._try_remove_faction(state, "perLeaderChange",
+                        scapegoat_name=leading_name,
+                        beneficiaries=[new_leader])
             else:
                 new_leader = "none"
 
