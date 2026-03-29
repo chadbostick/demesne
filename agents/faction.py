@@ -165,56 +165,6 @@ class FactionAgent(BaseAgent):
                 lines.append(f"  {stance:<17}— {info['description']}")
         return "\n".join(lines)
 
-    def run_strategy(
-        self, context: dict, round_num: int, available_strategies: list[str],
-        cultures: dict | None = None,
-    ) -> AgentOutput:
-        tokens = context.get("own_tokens") or self.faction_data["tokens"]
-        recent = self._recent_block(context)
-        current_stance = self.faction_data.get("current_stance") or "pursue_primary"
-        prefs_block = self._culture_preferences_block(cultures) if cultures else ""
-        prefs_section = f"\n{prefs_block}\n" if prefs_block else ""
-
-        prompt = f"""\
-You are {self.faction_data['name']}, a {self.faction_data['organization_type']} of {self.faction_data['species']}.
-
-{self._ideology_block()}
-
-{self._goals_block()}
-
-{self._tokens_block(tokens)}
-
-SETTLEMENT STATE:
-{context.get('state_summary', '')}
-
-{recent}
-
-COOPERATION APPROACH: {self.ideology.get('cooperation_currency', '')}
-BETRAYAL TENDENCY: {self.ideology.get('betrayal_pattern', '')}
-{prefs_section}
-
-YOUR CURRENT STANCE: {current_stance}
-(You may maintain this stance or choose a new one.)
-
-AVAILABLE STANCES:
-{self._stance_descriptions()}
-
-Each stance maps to a base action: pursue_primary/secondary/tertiary/coordinate/oppose → earn tokens via pray/discuss/lead/organize/forage. "make" → exchange tokens to build.
-
-VOICE CONSTRAINT: Write your narrative as an in-character settler. Do NOT name token colors, reference victory points, or describe game mechanics. Describe your people's actions and motivations as if you are living in this world.
-
-Choose your stance and the concrete strategy that enacts it. Output your choice in this exact format:
-
-<strategy_choice>
-{{
-  "stance": "<stance name>",
-  "strategy": "<pray|discuss|lead|organize|forage|make>",
-  "narrative": "<1-2 sentences in-character, no token color names, no VP references>"
-}}
-</strategy_choice>
-"""
-        return self._call_llm(prompt, round_num, "strategy")
-
     def run_investment(
         self, context: dict, round_num: int, cultures: dict
     ) -> AgentOutput:
@@ -267,67 +217,6 @@ If you choose not to invest, use an empty purchases list: "purchases": []
 """
         return self._call_llm(prompt, round_num, "investment")
 
-    def run_challenge(
-        self,
-        context: dict,
-        round_num: int,
-        challenge_text: str,
-        is_leading: bool,
-        prior_donations: dict[str, dict],
-    ) -> AgentOutput:
-        tokens = context.get("own_tokens") or self.faction_data["tokens"]
-        total_tokens = sum(tokens.values())
-
-        donations_so_far = ""
-        if prior_donations:
-            donations_so_far = "DONATIONS SO FAR:\n" + "\n".join(
-                f"  {name}: {sum(d.values())} tokens" for name, d in prior_donations.items()
-            )
-
-        role_note = (
-            "You are the LEADING FACTION. You decide the response strategy and your donation "
-            "will anchor the effort."
-            if is_leading
-            else "You may donate tokens to support the Leading Faction's response. "
-                 "Consider whether the outcome serves your goals."
-        )
-
-        prompt = f"""\
-You are {self.faction_data['name']}, a {self.faction_data['organization_type']} of {self.faction_data['species']}.
-
-{self._ideology_block()}
-
-{self._tokens_block(tokens)}
-
-SETTLEMENT STATE:
-{context.get('state_summary', '')}
-
-CHALLENGE THIS ERA:
-{challenge_text}
-
-{role_note}
-
-{donations_so_far}
-
-Rules:
-- Each token donated adds +1 to the d20 roll. Total of 10+ = success.
-- Tokens spent on the challenge are permanently lost.
-- Success: the settlement receives a Boon and the Leading Faction stays in power.
-- Failure: the challenge harms the settlement, the Leading Faction loses power.
-
-Decide how many tokens to donate and from which colors. Describe your decision in your voice (1-2 sentences).
-
-<challenge_response>
-{{
-  "tokens_donated": {{"red": 0, "blue": 0, "green": 0, "orange": 0, "pink": 0}},
-  "narrative": "<your 1-2 sentence description>"
-}}
-</challenge_response>
-
-Only include colors where you are donating > 0 tokens. You may donate 0 total if you choose.
-"""
-        return self._call_llm(prompt, round_num, "challenge")
-
     def run_challenge_plan(
         self,
         era: int,
@@ -358,52 +247,6 @@ Write in THIRD PERSON — refer to {self.faction_data['name']} by name or as "th
 VOICE CONSTRAINT: No tokens, dice, victory points, or game mechanics.
 """
         return self._call_llm(prompt, era, "challenge_plan", max_tokens=256)
-
-    def run_challenge_narrative(
-        self,
-        context: dict,
-        era: int,
-        challenge_text: str,
-        donation_summary: str,
-        difficulty: int,
-        result: dict,
-        cultures: dict | None = None,
-    ) -> "AgentOutput":
-        """Leader-only LLM call: narrate challenge resolution in character."""
-        success = result.get("success", False)
-        roll_total = result.get("total", 0)
-        outcome_word = "prevailed" if success else "failed"
-        if success:
-            boon_line = f"A boon was earned: {result.get('boon', '')}"
-        else:
-            boon_line = "The settlement suffered setback. Leadership will pass to another faction."
-
-        culture_block = self._cultural_identity_block(cultures) if cultures else ""
-        culture_section = f"\n{culture_block}\n" if culture_block else ""
-
-        prompt = f"""\
-You are {self.faction_data['name']}, leading the settlement through a crisis.
-
-{self._ideology_block()}
-{culture_section}
-THE CRISIS:
-{challenge_text}
-
-HOW THE SETTLEMENT RESPONDED:
-{donation_summary}
-
-OUTCOME: The settlement {outcome_word}.
-{boon_line}
-
-Narrate this moment in your faction's voice. Speak as the leader addressing your people.
-
-VOICE CONSTRAINT: Write as an in-character settler leader. Do NOT mention tokens, dice rolls,
-victory points, difficulty numbers, or any game mechanics. Ground the language in your ideology's
-voice and worldview. 2-3 sentences only.
-"""
-        return self._call_llm(prompt, era, "challenge_narrative")
-
-    # ── Shared helpers ─────────────────────────────────────────────────────────
 
     def _recent_block(self, context: dict) -> str:
         recent = context.get("recent_actions", [])
@@ -512,79 +355,6 @@ Nothing else.
             return json.loads(match.group(1).strip())
         except json.JSONDecodeError:
             return {}
-
-    def run_strategy_narrative(
-        self,
-        era: int,
-        strategy: str,
-        tokens_earned: int,
-        make_info: dict | None = None,
-        cultures: dict | None = None,
-        previous_narrative: str | None = None,
-    ) -> "AgentOutput":
-        """
-        Brief in-character narration of what the faction did this era.
-        Strategy is already decided — LLM only provides flavor.
-        """
-        _STRATEGY_ACTIVITY = {
-            "pray":     "spiritual practice — prayer, ritual, devotion",
-            "discuss":  "assembly and discourse — debate, persuasion, civic exchange",
-            "lead":     "leadership and inspiration — rallying, guiding, setting direction",
-            "organize": "civic organization — planning, coordinating, building systems",
-            "forage":   "scouting and gathering — exploring the land, collecting resources",
-        }
-
-        if make_info:
-            activity_line = (
-                f"Your people built something this era: {make_info['name']}.\n"
-                f"What it is: {make_info['description']}"
-            )
-            result_line = "The structure now stands in the settlement."
-        else:
-            activity = _STRATEGY_ACTIVITY.get(strategy, strategy)
-            if tokens_earned == 0:
-                quality = "the effort yielded little — a difficult era"
-            elif tokens_earned <= 2:
-                quality = "the effort yielded modest returns"
-            elif tokens_earned <= 5:
-                quality = "the effort yielded strong returns"
-            else:
-                quality = "the effort yielded an exceptional bounty"
-            activity_line = f"Your people's focus this era: {activity}."
-            result_line = f"How it went: {quality}."
-
-        culture_block = self._cultural_identity_block(cultures) if cultures else ""
-        culture_section = f"\n{culture_block}\n" if culture_block else ""
-
-        prev_block = ""
-        if previous_narrative:
-            prev_block = (
-                f"\nLAST GENERATION YOU WROTE (do NOT repeat this — advance the story):\n"
-                f"  {previous_narrative[:200]}...\n"
-            )
-
-        prompt = f"""\
-You are the chronicler for {self.faction_data['name']}, a {self.faction_data['organization_type']} of {self.faction_data['species']}.
-
-{self._ideology_block()}
-{culture_section}{prev_block}
-DURING THIS GENERATION:
-{activity_line}
-{result_line}
-
-Each era spans decades or centuries — not days or years. Write 2-3 sentences describing what \
-{self.faction_data['name']} accomplished across this long age and how it shaped their people. \
-Describe the work of generations: dynasties rising and falling, traditions calcifying into \
-law, landscapes transformed by sustained effort, entire lifetimes lived within the structures \
-their ancestors built. Write in THIRD PERSON — refer to the faction by name or \
-as "they", never "we" or "our".
-
-VOICE CONSTRAINT: No token colors, no rolls, no victory points, no game mechanics. \
-Write as history, not a turn report.
-"""
-        return self._call_llm(prompt, era, "strategy_narrative", max_tokens=512)
-
-    # _call_llm inherited from BaseAgent
 
     def run_rename_strategy(
         self,
