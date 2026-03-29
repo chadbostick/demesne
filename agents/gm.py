@@ -23,6 +23,7 @@ class GMAgent(BaseAgent):
         previous_chronicle: str | None = None,
         strategy_summary: str | None = None,
         previous_challenges: list[str] | None = None,
+        inspiration: str | None = None,
     ) -> AgentOutput:
         prev_block = ""
         if previous_chronicle:
@@ -58,6 +59,8 @@ Consider HOW this crisis connects to what came before. Is it:
   community to rethink everything they assumed was true)
 - A FORETOLD reckoning? (Signs were there — did the people prepare, ignore them, \
   or reject the warnings?)
+
+{f'CREATIVE INSPIRATION (weave naturally as a detail or concept — do not use literally): {inspiration}' if inspiration else ''}
 
 The best history reads like inevitability in hindsight. The settlement's ESTABLISHED CULTURES \
 (listed in state above) determine what's at stake — the crisis threatens what the community \
@@ -218,6 +221,7 @@ VOICE CONSTRAINT: Write as a historian and cartographer. No game mechanics, toke
         challenge_result: dict,
         previous_era_names: list[str] | None = None,
         previous_chronicles: list[str] | None = None,
+        inspiration: str | None = None,
     ) -> AgentOutput:
         # Extract only in-character narrative text from era outputs (skip mechanical logs)
         narrative_lines = []
@@ -265,7 +269,7 @@ WHAT THE FACTIONS SAID AND DID THIS GENERATION:
 
 CHALLENGE OUTCOME:
 {result_text}
-
+{f'CREATIVE INSPIRATION (weave naturally as a detail or concept — do not use literally): {inspiration}' if inspiration else ''}
 Decades or centuries have passed. Write TWO sections:
 
 First, close this historical period in 4-6 sentences. Name this period something NEW. \
@@ -321,6 +325,7 @@ mechanics. No faction labels. Describe the lived reality of this change.
         state_summary: str,
         faction_summaries: list[dict],
         mode: str = "summary",
+        inspiration: str | None = None,
     ) -> AgentOutput:
         lines = []
         for fs in faction_summaries:
@@ -336,6 +341,8 @@ mechanics. No faction labels. Describe the lived reality of this change.
             lines.append(f"- {label}: focused on {fs['activity']} — {outcome}")
         source_block = "WHAT EACH FACTION DID:\n" + "\n".join(lines)
 
+        insp_block = f"\nCREATIVE INSPIRATION (weave naturally as a detail or concept — do not use literally): {inspiration}\n" if inspiration else ""
+
         prompt = f"""\
 You are the chronicler of a fantasy settlement.
 
@@ -343,7 +350,7 @@ SETTLEMENT STATE:
 {state_summary}
 
 {source_block}
-
+{insp_block}
 Write a short chronicle of this age. For each faction, write 2-3 sentences in third person \
 describing what they accomplished. Then end with 1-2 sentences about what the settlement \
 achieved and what remains fragile.

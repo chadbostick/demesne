@@ -28,6 +28,87 @@ from mechanics.strategies import STRATEGIC_STANCES
 from mechanics.worldbuilding import LOCATIONS, TERRAINS, DND5_RACES
 
 
+def fetch_and_transform_wiki_seeds() -> tuple[str, list[str]]:
+    """
+    Fetch a random Wikipedia article, extract 7 facts, and transform them
+    into fantasy-appropriate inspiration seeds via one LLM call.
+    Returns (article_title, [7 seed strings]).
+    Falls back to local generation if network fails.
+    """
+    import anthropic
+    try:
+        import requests
+        resp = requests.get(
+            "https://en.wikipedia.org/wiki/Special:Random",
+            headers={"User-Agent": "Demesne-Worldbuilder/1.0"},
+            timeout=10,
+            allow_redirects=True,
+        )
+        resp.raise_for_status()
+
+        # Extract title from the URL (last path segment)
+        title = resp.url.split("/wiki/")[-1].replace("_", " ") if "/wiki/" in resp.url else "Unknown"
+
+        # Extract plain text from HTML (rough but sufficient)
+        from html.parser import HTMLParser
+        class TextExtractor(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self._text = []
+                self._skip = False
+            def handle_starttag(self, tag, attrs):
+                if tag in ("script", "style", "nav", "footer", "header"):
+                    self._skip = True
+            def handle_endtag(self, tag):
+                if tag in ("script", "style", "nav", "footer", "header"):
+                    self._skip = False
+            def handle_data(self, data):
+                if not self._skip:
+                    self._text.append(data)
+            def get_text(self):
+                return " ".join(self._text)[:3000]
+
+        extractor = TextExtractor()
+        extractor.feed(resp.text)
+        article_text = extractor.get_text()
+
+    except Exception:
+        return "", []  # No seeds if wiki unreachable
+
+    # LLM call to extract and transform seeds
+    try:
+        client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+        prompt = f"""\
+You just read about: {title}
+
+Content excerpt:
+{article_text[:2000]}
+
+Extract 7 interesting details (names, concepts, events, places, practices, objects, phenomena) \
+from this content. Then transform EACH into a fantasy-appropriate inspiration seed. Do NOT use \
+real-world content literally — let it INSPIRE fantasy: a creature, material, spell, cultural \
+practice, architectural style, historical event, or character archetype.
+
+Each seed should be 1-2 sentences of evocative fantasy flavor.
+
+Output ONLY a JSON array of exactly 7 strings, nothing else.
+Example: ["A crystalline moss that grows only in caves where echoes never fade", "...", ...]
+"""
+        message = client.messages.create(
+            model=config.MODEL,
+            max_tokens=512,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = message.content[0].text.strip()
+        # Parse JSON array
+        import json as _json
+        seeds = _json.loads(raw)
+        if isinstance(seeds, list) and len(seeds) >= 7:
+            return title, seeds[:7]
+    except Exception:
+        return title, []  # No seeds if LLM fails
+
+
 def _vprint(*args, **kwargs):
     """Print only if verbose mode is on."""
     if config.VERBOSE:
@@ -450,6 +531,16 @@ def main() -> None:
     _vprint(f"    Terrain  : {terrain}")
     logger.log_event("geography", era=0, location=location, terrain=terrain)
 
+    # ── Fetch creative inspiration from random Wikipedia article ──────────
+    _vprint("\n  [WIKI SEED]")
+    _vprint("    Fetching random Wikipedia article...", end="", flush=True)
+    wiki_title, wiki_seeds = fetch_and_transform_wiki_seeds()
+    _vprint(f" {wiki_title}")
+    state.set_inspiration_seeds(wiki_title, wiki_seeds)
+    for i, seed in enumerate(wiki_seeds):
+        _vprint(f"    Seed {i}: {seed[:80]}...")
+    logger.log_event("wiki_seeds", era=0, source_article=wiki_title, seeds=wiki_seeds)
+
     # Seed economy based on geography
     _TERRAIN_PRODUCTION = {
         "Mountains": ["stone", "ore", "mountain herbs"],
@@ -512,10 +603,12 @@ def main() -> None:
     all_faction_data = [state.get_faction(a.faction_data["name"]) for a in faction_agents]
     from concurrent.futures import ThreadPoolExecutor
 
+    leader_seed = state.get_seed(1)  # Seed 2 → leading faction
     def _introduce(agent):
         fname = agent.faction_data["name"]
         neighbors = [f for f in all_faction_data if f["name"] != fname]
-        return agent, agent.introduce_faction(location, terrain, neighbors)
+        insp = leader_seed if fname == initiative_order[0] else None
+        return agent, agent.introduce_faction(location, terrain, neighbors, inspiration=insp)
 
     with ThreadPoolExecutor(max_workers=len(faction_agents)) as executor:
         intro_results = list(executor.map(lambda a: _introduce(a), faction_agents))
@@ -539,6 +632,7 @@ def main() -> None:
             if state._data["leading_faction"] == fname:
                 state._data["leading_faction"] = new_name
             agent.role = f"faction_{new_name.lower().replace(' ', '_')}"
+            state.register_name(new_name)
             # Store founding leader as historical figure
             founding_leader = intro.get("founding_leader", "")
             if founding_leader:
@@ -582,7 +676,8 @@ def main() -> None:
     # ── Settlement naming (leading faction, LLM) ─────────────────────────────
     leader_agent = next(a for a in faction_agents if a.faction_data["name"] == state.leading_faction)
     _vprint(f"\n    → {state.leading_faction} naming the settlement...", end="", flush=True)
-    naming_output = leader_agent.name_settlement(location, terrain)
+    land_seed = state.get_seed(0)  # Seed 1 → land description
+    naming_output = leader_agent.name_settlement(location, terrain, inspiration=land_seed)
     _vprint(" done.\n")
     naming_choice = leader_agent.parse_settlement_name(naming_output)
     settlement_name = naming_choice.get("name") or args.settlement_name
@@ -590,6 +685,7 @@ def main() -> None:
     state._data["name"] = settlement_name
     if landmark_desc:
         state.set_landmark_description(landmark_desc)
+    state.register_name(settlement_name)
     print(f"  Settlement named: {settlement_name}")
     if landmark_desc:
         print(f"  Landmarks: {landmark_desc}")

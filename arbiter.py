@@ -100,6 +100,8 @@ class Arbiter:
         os.makedirs(output_dir, exist_ok=True)
         while not state.game_over and state.era < max_eras:
             state.increment_era()
+            # Grab this era's inspiration seed (seeds 2-6 for eras 1-5)
+            self._era_inspiration = state.get_next_seed(used_in=f"era_{state.era}")
             stage = state.settlement_stage()
             print(f"\n{'='*60}\n  Age {state.era} — {state._data['name']} ({stage})\n{'='*60}")
             era_outputs = self.run_era(state)
@@ -835,6 +837,7 @@ class Arbiter:
                 figure = self._extract_historical_figure(culture_narrative.content, fname, state.era, "reformer")
                 if figure:
                     state.add_historical_figure(figure)
+                    state.register_name(figure["name"])
                     self._vprint(f"      [Historical figure: {figure['name']} — {figure['deed']}]")
                     self._logger.log_event("historical_figure", **figure)
                 print(culture_narrative.content)
@@ -1038,6 +1041,7 @@ class Arbiter:
             "gm_description": gm_description,
         }
         state.add_place(place)
+        state.register_name(place_name)
         self._logger.log_event("place_founded", era=state.era, **place)
 
     def _check_color_level_up(
@@ -1763,6 +1767,7 @@ class Arbiter:
             if not success:
                 figure["status"] = "cautionary"
             state.add_historical_figure(figure)
+            state.register_name(figure["name"])
             self._vprint(f"    [Historical figure: {figure['name']} — {figure['deed']}]")
             self._logger.log_event("historical_figure", **figure)
 
@@ -1805,6 +1810,7 @@ class Arbiter:
             getattr(self, "_last_challenge_result", {}),
             previous_era_names=list(self._era_names),
             previous_chronicles=list(self._era_chronicle),
+            inspiration=getattr(self, "_era_inspiration", None),
         )
         self._vprint(" done.\n")
         print(gm_output.content)

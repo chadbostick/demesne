@@ -669,7 +669,8 @@ Nothing else.
         return self._call_llm(prompt, era, "rename_strategy", max_tokens=128)
 
     def introduce_faction(
-        self, location: str, terrain: str, neighbor_factions: list[dict]
+        self, location: str, terrain: str, neighbor_factions: list[dict],
+        inspiration: str | None = None,
     ) -> "AgentOutput":
         """
         At game start, the faction introduces itself: names itself and explains
@@ -692,7 +693,7 @@ GEOGRAPHY:
   Terrain: {terrain}
 
 {neighbors_block}
-
+{f'CREATIVE INSPIRATION (weave this naturally as a detail or concept — do not use literally): {inspiration}' if inspiration else ''}
 Your people have journeyed here to build something lasting. As their leader, introduce your faction:
 
 1. Choose a name for your organization — something that reflects your species, your ideology, and \
@@ -727,12 +728,13 @@ Nothing else.
             return {}
 
     def name_settlement(
-        self, location: str, terrain: str
+        self, location: str, terrain: str, inspiration: str | None = None,
     ) -> "AgentOutput":
         """
         Leading faction names the settlement based on geography and ideology.
         Returns a name and 3-sentence description of natural landmarks.
         """
+        insp_block = f"\nCREATIVE INSPIRATION (weave this naturally into the landmark description — do not use literally): {inspiration}\n" if inspiration else ""
         prompt = f"""\
 You are {self.faction_data['name']}, a {self.faction_data['organization_type']} of {self.faction_data['species']}.
 
@@ -743,7 +745,7 @@ Your people have arrived at a new land to settle. The region is approximately 10
 GEOGRAPHY:
   Location: {location}
   Terrain: {terrain}
-
+{insp_block}
 As the leading faction, you have the honor of naming this settlement. Choose a name that reflects \
 what your people see when they look at this land — filtered through your ideology and worldview.
 

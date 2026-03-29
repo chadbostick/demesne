@@ -47,6 +47,8 @@ class SettlementState:
                 "trade_partners": [],
             },
             "initiative_order": [],
+            "inspiration_seeds": {"source_article": "", "seeds": []},
+            "used_names": [],
             "location": None,
             "terrain": None,
             "landmark_description": None,
@@ -107,6 +109,43 @@ class SettlementState:
     def unlock_make_option(self, make_name: str) -> None:
         if make_name not in self._data["available_make_options"]:
             self._data["available_make_options"].append(make_name)
+
+    # ── Inspiration seeds ──────────────────────────────────────────────────
+
+    def set_inspiration_seeds(self, source_article: str, seeds: list[str]) -> None:
+        self._data["inspiration_seeds"] = {
+            "source_article": source_article,
+            "seeds": [{"id": i, "concept": s, "used": False, "used_in": None} for i, s in enumerate(seeds)],
+        }
+
+    def get_seed(self, index: int) -> str | None:
+        """Get a specific seed by index and mark it used."""
+        seeds = self._data["inspiration_seeds"]["seeds"]
+        if 0 <= index < len(seeds):
+            seeds[index]["used"] = True
+            return seeds[index]["concept"]
+        return None
+
+    def get_next_seed(self, used_in: str = "") -> str | None:
+        """Get the next unused seed and mark it used."""
+        for seed in self._data["inspiration_seeds"]["seeds"]:
+            if not seed["used"]:
+                seed["used"] = True
+                seed["used_in"] = used_in
+                return seed["concept"]
+        return None
+
+    # ── Name deduplication ────────────────────────────────────────────────
+
+    def register_name(self, name: str) -> None:
+        if name and name not in self._data["used_names"]:
+            self._data["used_names"].append(name)
+
+    def used_names_block(self) -> str:
+        names = self._data.get("used_names", [])
+        if not names:
+            return ""
+        return f"NAMES ALREADY IN USE (choose DIFFERENT names): {', '.join(names)}"
 
     # ── Historical figures ──────────────────────────────────────────────────
 
@@ -411,6 +450,9 @@ class SettlementState:
         if hist:
             lines.append(hist)
         lines.append(self.cultural_identity())
+        used = self.used_names_block()
+        if used:
+            lines.append(used)
         lines += [
             f"Strategies available: {', '.join(d['available_strategies'])}",
             f"Current challenge: {d['current_challenge'] or 'none'}",
