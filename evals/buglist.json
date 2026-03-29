@@ -1,0 +1,562 @@
+[
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:266",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:274",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:282",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:367",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:375",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:490",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:500",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:508",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:516",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:524",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:595",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:699",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:975",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:1251",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:1537",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:1814",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2109",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2115",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2121",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2127",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2133",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2139",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2145",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2151",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2157",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2163",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2169",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2175",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2181",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2187",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2193",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2199",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2205",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2211",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2217",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2223",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2231",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2248",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2264",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2279",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2295",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2312",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2329",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2346",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2364",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2372",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2380",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2388",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2396",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2404",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2412",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2420",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2428",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2436",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2444",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2452",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2460",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2468",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "json_leak",
+    "location": "narrative_summary.txt:2476",
+    "detail": "Raw JSON object in narrative",
+    "severity": "high"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "metagame_leak",
+    "location": "narrative_summary.txt:961",
+    "detail": "culture level label: 'L2'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "metagame_leak",
+    "location": "narrative_summary.txt:1237",
+    "detail": "culture level label: 'L2'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "metagame_leak",
+    "location": "narrative_summary.txt:1511",
+    "detail": "culture level label: 'L2'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "metagame_leak",
+    "location": "narrative_summary.txt:1517",
+    "detail": "culture level label: 'L2'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "metagame_leak",
+    "location": "narrative_summary.txt:1523",
+    "detail": "culture level label: 'L3'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "metagame_leak",
+    "location": "narrative_summary.txt:1800",
+    "detail": "culture level label: 'L2'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "metagame_leak",
+    "location": "narrative_summary.txt:2079",
+    "detail": "culture level label: 'L2'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "name_duplicate",
+    "location": "game_chronicle.json",
+    "detail": "'Lysander the Architect**' appears 2 times",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "truncated_text",
+    "location": "narrative_summary.txt:~150",
+    "detail": "Block 13 ends mid-word: '...eek. The wind-twisted groves that marked'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "truncated_text",
+    "location": "narrative_summary.txt:~280",
+    "detail": "Block 26 ends mid-word: '...hearing in ways that make others believe'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "truncated_text",
+    "location": "narrative_summary.txt:~288",
+    "detail": "Block 27 ends mid-word: '...rvival means extracting value from every'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "truncated_text",
+    "location": "narrative_summary.txt:~346",
+    "detail": "Block 33 ends mid-word: '...ot to destroy them but to understand the'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "truncated_text",
+    "location": "narrative_summary.txt:~381",
+    "detail": "Block 36 ends mid-word: '...e allocations are recorded and preserved'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "truncated_text",
+    "location": "narrative_summary.txt:~403",
+    "detail": "Block 37 ends mid-word: '...e settlement's farms still turned to the'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "truncated_text",
+    "location": "narrative_summary.txt:~469",
+    "detail": "Block 46 ends mid-word: '...wn failure to teach her people that some'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "truncated_text",
+    "location": "narrative_summary.txt:~506",
+    "detail": "Block 49 ends mid-word: '...le making certain that those who need to'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "truncated_text",
+    "location": "narrative_summary.txt:~514",
+    "detail": "Block 50 ends mid-word: '...and expand the community's manufacturing'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "truncated_text",
+    "location": "narrative_summary.txt:~522",
+    "detail": "Block 51 ends mid-word: '... allowing the Verdant Compact to measure'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "truncated_text",
+    "location": "narrative_summary.txt:~530",
+    "detail": "Block 52 ends mid-word: '...e it that power here flows from will and'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "truncated_text",
+    "location": "narrative_summary.txt:~556",
+    "detail": "Block 55 ends mid-word: '...d always known: that the only chasm that'",
+    "severity": "medium"
+  },
+  {
+    "run": "20260329-0019 Ascendant Strand",
+    "bug_type": "truncated_text",
+    "location": "narrative_summary.txt:~574",
+    "detail": "Block 57 ends mid-word: '...minder that the strongest structures are'",
+    "severity": "medium"
+  }
+]
