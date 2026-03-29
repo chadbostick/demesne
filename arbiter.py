@@ -227,6 +227,16 @@ class Arbiter:
         init_roll = roll(20)
         faction_data["influence"] = init_roll
 
+        # Starting token bonus: 1d3-1 per era elapsed (late arrivals bring resources)
+        _all_colors = ["red", "blue", "green", "orange", "pink"]
+        bonus_per_era = max(0, roll(3) - 1)
+        total_bonus = bonus_per_era * state.era
+        if total_bonus > 0:
+            for _ in range(total_bonus):
+                c = random.choice(_all_colors)
+                faction_data["tokens"][c] = faction_data["tokens"].get(c, 0) + 1
+            self._vprint(f"    [Starting bonus: {total_bonus} tokens ({bonus_per_era}/era × {state.era} eras)]")
+
         # Add to state
         state.add_faction(faction_data)
         faction = state.get_faction(faction_data["name"])
@@ -295,10 +305,18 @@ class Arbiter:
         for a in self._factions:
             a.faction_data = state.get_faction(a.faction_data["name"])
 
+        # Score VP immediately (existing cultures may satisfy goals)
+        from mechanics.scoring import score_faction
+        vp = score_faction(faction, state.cultures)
+        faction["victory_points"] = vp
+        if vp > 0:
+            self._vprint(f"    [{new_name} arrives with {vp} VP from existing cultures]")
+
         self._logger.log_event("faction_arrived", era=state.era,
             faction=new_name, ideology=ideology, species=species,
-            influence=init_roll)
-        self._vprint(f"    [{new_name} joins with influence {init_roll}]")
+            influence=init_roll, starting_tokens=dict(faction["tokens"]),
+            starting_vp=vp)
+        self._vprint(f"    [{new_name} joins with influence {init_roll}, {sum(faction['tokens'].values())} tokens, {vp} VP]")
 
     def _vprint(self, *args, **kwargs):
         """Print only if verbose mode is on."""
