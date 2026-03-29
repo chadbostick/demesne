@@ -355,22 +355,17 @@ def main():
     parser = argparse.ArgumentParser(description="Demesne evaluation pipeline")
     parser.add_argument("--skip-run", action="store_true", help="Skip simulation, analyze existing output")
     parser.add_argument("--run-dir", help="Analyze a specific run folder")
-    parser.add_argument("--eras", type=int, default=6, help="Eras for simulation")
-    parser.add_argument("--factions", type=int, default=4, help="Starting factions")
-    parser.add_argument("--difficulty", type=int, default=10, help="Starting difficulty")
-    args = parser.parse_args()
+    args, extra_args = parser.parse_known_args()
 
     output_dir = os.path.join(PROJECT_ROOT, "output")
 
-    # Step 1: Run simulation
+    # Step 1: Run simulation (pass all extra args directly to main.py)
     if not args.skip_run and not args.run_dir:
         print("=== RUNNING SIMULATION ===")
-        cmd = [
-            sys.executable, os.path.join(PROJECT_ROOT, "main.py"),
-            "--eras", str(args.eras),
-            "--factions", str(args.factions),
-            "--difficulty", str(args.difficulty),
-        ]
+        # Default args if none provided
+        if not any(a.startswith("--eras") for a in extra_args):
+            extra_args = ["--eras", "6", "--factions", "4"] + extra_args
+        cmd = [sys.executable, os.path.join(PROJECT_ROOT, "main.py")] + extra_args
         print(f"  Command: {' '.join(cmd)}")
         result = subprocess.run(cmd, cwd=PROJECT_ROOT)
         if result.returncode != 0:
