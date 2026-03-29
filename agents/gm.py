@@ -50,17 +50,15 @@ You are the chronicler of a fantasy settlement. You record history as it unfolds
 SETTLEMENT STATE:
 {state_summary}
 {prev_block}{strat_block}{prev_challenges_block}
-THE CRISIS OF THIS AGE: "{challenge_text}"
+{f'TWO POSSIBLE CRISES FOR THIS AGE — pick the one that fits this settlement better, or combine elements from both:' if inspiration else 'THE CRISIS OF THIS AGE:'}
+  OPTION A: "{challenge_text}"
+{f'  OPTION B: "{inspiration}"' if inspiration else ''}
 
-Consider HOW this crisis connects to what came before. Is it:
-- A CONSEQUENCE of the settlement's choices? (They ignored warnings, overextended, \
-  neglected something vital, or their success created new vulnerabilities)
-- An UNKNOWABLE disruption? (Something no one could have predicted that forces the \
-  community to rethink everything they assumed was true)
-- A FORETOLD reckoning? (Signs were there — did the people prepare, ignore them, \
-  or reject the warnings?)
-
-{f'CREATIVE INSPIRATION (weave naturally as a detail or concept — do not use literally): {inspiration}' if inspiration else ''}
+Choose whichever is more compelling for THIS settlement's story, or blend elements \
+from both into something original. The crisis should connect to what came before:
+- A CONSEQUENCE of the settlement's choices?
+- An UNKNOWABLE disruption?
+- A FORETOLD reckoning?
 
 The best history reads like inevitability in hindsight. The settlement's ESTABLISHED CULTURES \
 (listed in state above) determine what's at stake — the crisis threatens what the community \

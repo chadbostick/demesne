@@ -1670,13 +1670,16 @@ class Arbiter:
         # Track leader before challenge for reconsideration trigger in end-of-era
         self._leader_before_challenge = state.leading_faction
 
-        # Draw challenge event and have GM localize it
+        # Draw challenge event — offer GM a choice between random event and inspiration seed
         challenge_event = random.choice(CHALLENGE_EVENTS)
+        era_seed = getattr(self, "_era_inspiration", None)
         difficulty = state.challenge_difficulty
         self._vprint(f"    Challenge event: {challenge_event}")
+        if era_seed:
+            self._vprint(f"    Inspiration alt: {era_seed[:60]}...")
         self._vprint(f"    Difficulty: {difficulty}")
 
-        # GM narrates the challenge with regional specifics
+        # GM narrates the challenge — picks the most compelling option
         self._vprint(f"\n    → GM describing the challenge...", end="", flush=True)
         prev_chron = self._era_chronicle[-1] if self._era_chronicle else None
         strat_sum = getattr(self, "_last_strategy_summary", None)
@@ -1688,7 +1691,7 @@ class Arbiter:
             previous_chronicle=prev_chron,
             strategy_summary=strat_sum,
             previous_challenges=list(self._previous_challenges) if self._previous_challenges else None,
-            inspiration=getattr(self, "_era_inspiration", None),
+            inspiration=era_seed,
         )
         self._vprint(" done.\n")
         challenge_text = gm_challenge.content
@@ -1967,27 +1970,25 @@ class Arbiter:
             # noInfluence: any faction below 0
             self._try_remove_faction(state, "noInfluence")
 
-            # perFail: scapegoat = biggest contributor to the failed challenge
-            if contributing_factions:
-                # Find who contributed most tokens
-                contributor_totals = {}
-                for part in donation_parts:
-                    for f in state.factions:
-                        if f["name"] in part and ": 0" not in part:
-                            # Extract donation amount from the string
-                            import re as _re
-                            match = _re.search(r": (\d+)", part)
-                            if match and f["name"] in part:
-                                contributor_totals[f["name"]] = contributor_totals.get(f["name"], 0) + int(match.group(1))
-                if contributor_totals:
-                    scapegoat = max(contributor_totals, key=contributor_totals.get)
-                else:
-                    scapegoat = leading_name
-                non_contributors = [f["name"] for f in state.factions
-                                    if f["name"] not in contributing_factions and f["name"] != scapegoat]
-                self._try_remove_faction(state, "perFail",
-                    scapegoat_name=scapegoat,
-                    beneficiaries=non_contributors if non_contributors else None)
+            # perFail: scapegoat = biggest contributor, or the leader if nobody contributed
+            contributor_totals = {}
+            for part in donation_parts:
+                for f in state.factions:
+                    if f["name"] in part and ": 0" not in part:
+                        import re as _re
+                        match = _re.search(r": (\d+)", part)
+                        if match and f["name"] in part:
+                            contributor_totals[f["name"]] = contributor_totals.get(f["name"], 0) + int(match.group(1))
+            if contributor_totals:
+                scapegoat = max(contributor_totals, key=contributor_totals.get)
+            else:
+                # Nobody contributed — the leader bears the blame
+                scapegoat = leading_name
+            non_contributors = [f["name"] for f in state.factions
+                                if f["name"] not in contributing_factions and f["name"] != scapegoat]
+            self._try_remove_faction(state, "perFail",
+                scapegoat_name=scapegoat,
+                beneficiaries=non_contributors if non_contributors else None)
 
             # New leader = highest influence
             if state.factions:
