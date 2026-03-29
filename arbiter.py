@@ -212,7 +212,7 @@ class Arbiter:
 
     def _add_new_faction(self, state: "SettlementState", ideology: str) -> None:
         """Add a new faction mid-game."""
-        from main import build_faction_data, compute_coalitions, compute_goal_costs
+        from mechanics.faction_utils import build_faction_data, compute_coalitions, compute_goal_costs
         from agents.faction import FactionAgent
         from mechanics.worldbuilding import DND5_RACES
         from mechanics.strategies import STRATEGIC_STANCES
@@ -232,7 +232,7 @@ class Arbiter:
         total_bonus = bonus_per_era * state.era
         if total_bonus > 0:
             # Compute which colors this faction actually needs
-            from main import compute_goal_costs
+            from mechanics.faction_utils import compute_goal_costs
             goal_costs = compute_goal_costs(faction_data["goals"], state.cultures)
             needed_colors: dict[str, int] = {}
             for goal_key in ["primary", "secondary_0", "secondary_1", "tertiary"]:
@@ -640,7 +640,7 @@ class Arbiter:
         on it until the shortfall is covered, unless a dramatically better
         opportunity emerges (>3 tokens closer).
         """
-        from main import compute_goal_costs
+        from mechanics.faction_utils import compute_goal_costs
         tokens = dict(faction["tokens"])
         goals = faction.get("goals", {})
         cultures = state.cultures
