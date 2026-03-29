@@ -43,7 +43,10 @@ def load_run_data(run_dir: str) -> dict:
     narrative_path = os.path.join(run_dir, "narrative_summary.txt")
     if os.path.exists(narrative_path):
         with open(narrative_path) as f:
-            data["narrative"] = f.read()
+            full_text = f.read()
+        # Strip FINAL STATE JSON dump (not narrative, just raw state)
+        final_marker = full_text.find("\nFINAL STATE\n")
+        data["narrative"] = full_text[:final_marker] if final_marker > 0 else full_text
 
     events_path = os.path.join(run_dir, "events.jsonl")
     if os.path.exists(events_path):
