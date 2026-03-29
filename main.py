@@ -393,6 +393,7 @@ def _build_game_chronicle(state: SettlementState, all_events: list[dict], max_er
         "places": state_data.get("places", []),
         "landmarks": state_data.get("landmarks", []),
         "boons": state_data.get("boons", []),
+        "inspiration_seeds": state_data.get("inspiration_seeds", {}),
         "eras": era_summaries,
     }
     return chronicle
