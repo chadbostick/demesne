@@ -75,6 +75,105 @@ class Arbiter:
         self._last_faction_narratives: dict[str, str] = {}  # faction_name → last narrative
         self._previous_challenges: list[str] = []  # challenge events from past eras
 
+    def _try_add_faction(self, state: "SettlementState", trigger: str) -> None:
+        """Attempt to add a new faction if the trigger matches the configured mode."""
+        if config.ADD_FACTIONS_MODE != trigger:
+            return
+        ideology = state.pop_available_ideology()
+        if not ideology:
+            return
+        self._add_new_faction(state, ideology)
+
+    def _add_new_faction(self, state: "SettlementState", ideology: str) -> None:
+        """Add a new faction mid-game."""
+        from main import build_faction_data, compute_coalitions, compute_goal_costs
+        from agents.faction import FactionAgent
+        from mechanics.worldbuilding import DND5_RACES
+        from mechanics.strategies import STRATEGIC_STANCES
+
+        # Build faction data
+        faction_data = build_faction_data(ideology, len(state.factions))
+        faction_data["current_stance"] = random.choice(list(STRATEGIC_STANCES.keys()))
+        species = random.choice(DND5_RACES)
+        faction_data["species"] = species
+
+        # Roll initiative → starting influence
+        init_roll = roll(20)
+        faction_data["influence"] = init_roll
+
+        # Add to state
+        state.add_faction(faction_data)
+        faction = state.get_faction(faction_data["name"])
+
+        # Create agent
+        agent = FactionAgent(faction_data)
+        agent.faction_data = faction
+        self._factions.append(agent)
+
+        # LLM introduction
+        location = state._data.get("location", "")
+        terrain = state._data.get("terrain", "")
+        neighbors = [f for f in state.factions if f["name"] != faction_data["name"]]
+        print(f"\n  ── A New Faction Arrives ──")
+        intro_output = agent.introduce_faction(
+            location, terrain, neighbors,
+            arriving=True,
+            settlement_context=state.summary()[:500],
+        )
+        intro = agent.parse_faction_intro(intro_output)
+        if intro:
+            old_name = faction_data["name"]
+            new_name = intro.get("faction_name", old_name)
+            org_type = intro.get("organization_type", "Guild")
+            description = intro.get("description", "")
+            faction["name"] = new_name
+            faction["organization_type"] = org_type
+            faction["description"] = description
+            agent.faction_data = faction
+            agent.role = f"faction_{new_name.lower().replace(' ', '_')}"
+            state.register_name(new_name)
+
+            founding_leader = intro.get("founding_leader", "")
+            if founding_leader:
+                state.add_historical_figure({
+                    "name": founding_leader, "role": "founder",
+                    "faction": new_name, "era": state.era,
+                    "deed": f"Led {new_name} to settle in {state._data['name']}",
+                    "status": "legendary",
+                })
+                state.register_name(founding_leader)
+
+            print(f"\n  **{new_name} ({ideology} {species})**")
+            if founding_leader:
+                print(f"  Led by {founding_leader}")
+            if description:
+                print(f"  {description}")
+        else:
+            new_name = faction_data["name"]
+            print(f"\n  **{new_name} ({ideology} {species})**")
+
+        # Update initiative order by influence
+        new_order = sorted(
+            [f["name"] for f in state.factions],
+            key=lambda n: state.get_faction(n).get("influence", 0),
+            reverse=True,
+        )
+        state._data["initiative_order"] = new_order
+        for a in self._factions:
+            a.faction_data = state.get_faction(a.faction_data["name"])
+
+        # Recompute coalitions for ALL factions
+        coalition_map = compute_coalitions(state.factions)
+        for f in state.factions:
+            f["coalition_plan"] = coalition_map.get(f["name"], {})
+        for a in self._factions:
+            a.faction_data = state.get_faction(a.faction_data["name"])
+
+        self._logger.log_event("faction_arrived", era=state.era,
+            faction=new_name, ideology=ideology, species=species,
+            influence=init_roll)
+        self._vprint(f"    [{new_name} joins with influence {init_roll}]")
+
     def _vprint(self, *args, **kwargs):
         """Print only if verbose mode is on."""
         if self._verbose:
@@ -100,6 +199,9 @@ class Arbiter:
         os.makedirs(output_dir, exist_ok=True)
         while not state.game_over and state.era < max_eras:
             state.increment_era()
+            # Add new faction if perEra mode (skip era 1 — initial factions already exist)
+            if state.era > 1:
+                self._try_add_faction(state, "perEra")
             # Grab this era's inspiration seed (seeds 2-6 for eras 1-5)
             self._era_inspiration = state.get_next_seed(used_in=f"era_{state.era}")
             stage = state.settlement_stage()
@@ -820,6 +922,7 @@ class Arbiter:
                 self._logger.log_event("culture_purchase", era=state.era,
                     faction=fname, category=cat, level=lvl, option=option,
                     cost=cost, tokens_after=dict(tokens), cooperative=False)
+                self._try_add_faction(state, "perLevel")
 
                 new_strat = f"{cat}_strategy"
                 new_make = f"{cat}_make"
@@ -1264,6 +1367,7 @@ class Arbiter:
                 state.unlock_make_option(f"{cat}_make")
                 made_any = True
                 bought_one = True
+                self._try_add_faction(state, "perLevel")
 
                 contribs = "; ".join(
                     f"{fn}: " + ", ".join(f"{n} {c}" for c, n in cols.items())
@@ -1638,6 +1742,9 @@ class Arbiter:
                 state.add_boon(boon)
             boon_str = " + ".join(boons)
             print(f"    [Boon: {boon_str}]")
+
+            # Add new faction on success if perSuccess mode
+            self._try_add_faction(state, "perSuccess")
 
             # Influence: leader +1d10, contributing factions each +1d6
             leader_inf_roll = roll(10)

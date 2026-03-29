@@ -25,6 +25,9 @@ CULTURE_PREFERENCE_MODE = "deterministic"
 MIN_FACTIONS = 2
 MAX_FACTIONS = 5
 
+# Dynamic faction addition: None | "perEra" | "perSuccess" | "perLevel"
+ADD_FACTIONS_MODE = None
+
 # Display modes (overridden by CLI flags)
 VERBOSE = False       # show metagame info (tokens, dice, decision trees)
 ALL_PAUSES = False    # pause at every phase, not just end of era

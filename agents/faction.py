@@ -671,20 +671,40 @@ Nothing else.
     def introduce_faction(
         self, location: str, terrain: str, neighbor_factions: list[dict],
         inspiration: str | None = None,
+        arriving: bool = False,
+        settlement_context: str | None = None,
     ) -> "AgentOutput":
         """
-        At game start, the faction introduces itself: names itself and explains
-        why it is settling this land.
+        Introduce a faction. If arriving=True, this is a mid-game arrival
+        at an established settlement, not a founding.
         """
         neighbors_block = ""
         if neighbor_factions:
-            lines = ["OTHER FACTIONS SETTLING HERE:"]
+            label = "ESTABLISHED FACTIONS ALREADY HERE:" if arriving else "OTHER FACTIONS SETTLING HERE:"
+            lines = [label]
             for nf in neighbor_factions:
-                lines.append(f"  - {nf['ideology']} ({nf['species']})")
+                lines.append(f"  - {nf.get('name', nf['ideology'])} ({nf['ideology']} {nf['species']})")
             neighbors_block = "\n".join(lines)
 
+        if arriving and settlement_context:
+            arrival_block = (
+                f"You are arriving at an ESTABLISHED settlement:\n{settlement_context}\n\n"
+                f"This place already has cultures, structures, and history. Your people are new here. "
+                f"Consider WHY your people have come — perhaps you are:\n"
+                f"  - Immigrants drawn by the settlement's growing prosperity\n"
+                f"  - A splinter faction that broke from an existing group over ideological differences\n"
+                f"  - Representatives of a distant realm, guild, or empire seeking a foothold\n"
+                f"  - Refugees fleeing catastrophe elsewhere, bringing skills and desperation\n"
+                f"  - A counter-movement that arose in response to the settlement's failures\n"
+                f"  - A merchant class that emerged from the settlement's trade networks\n"
+                f"Choose the origin that best fits your ideology and this settlement's story. "
+                f"What do you bring that the settlement lacks?"
+            )
+        else:
+            arrival_block = "Your people have journeyed here to build something lasting."
+
         prompt = f"""\
-You are the leader of a group of {self.faction_data['species']} arriving at a new land to settle.
+You are the leader of a group of {self.faction_data['species']} {'arriving at' if arriving else 'settling'} this land.
 
 {self._ideology_block()}
 
@@ -694,7 +714,7 @@ GEOGRAPHY:
 
 {neighbors_block}
 {f'CREATIVE INSPIRATION (weave this naturally as a detail or concept — do not use literally): {inspiration}' if inspiration else ''}
-Your people have journeyed here to build something lasting. As their leader, introduce your faction:
+{arrival_block} As their leader, introduce your faction:
 
 1. Choose a name for your organization — something that reflects your species, your ideology, and \
 your ambitions. Not a generic label like "The Guild" — a proper name with character.

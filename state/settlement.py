@@ -49,6 +49,7 @@ class SettlementState:
             "initiative_order": [],
             "inspiration_seeds": {"source_article": "", "seeds": []},
             "used_names": [],
+            "available_ideologies": [],
             "location": None,
             "terrain": None,
             "landmark_description": None,
@@ -109,6 +110,21 @@ class SettlementState:
     def unlock_make_option(self, make_name: str) -> None:
         if make_name not in self._data["available_make_options"]:
             self._data["available_make_options"].append(make_name)
+
+    # ── Available ideologies pool ─────────────────────────────────────────
+
+    def set_available_ideologies(self, ideologies: list[str]) -> None:
+        self._data["available_ideologies"] = list(ideologies)
+
+    def pop_available_ideology(self) -> str | None:
+        """Remove and return a random ideology from the available pool."""
+        import random as _random
+        pool = self._data["available_ideologies"]
+        if not pool:
+            return None
+        choice = _random.choice(pool)
+        pool.remove(choice)
+        return choice
 
     # ── Inspiration seeds ──────────────────────────────────────────────────
 

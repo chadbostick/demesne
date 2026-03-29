@@ -484,11 +484,16 @@ def main() -> None:
         "--pauses", action="store_true", default=config.ALL_PAUSES,
         help="Pause at every phase (default: only end of era)"
     )
+    parser.add_argument(
+        "--addFactions", choices=["perEra", "perSuccess", "perLevel"], default=None,
+        help="Add new factions dynamically (perEra|perSuccess|perLevel)"
+    )
     args = parser.parse_args()
 
     # Set global display modes
     config.VERBOSE = args.verbose
     config.ALL_PAUSES = args.pauses
+    config.ADD_FACTIONS_MODE = args.addFactions
 
     if not config.ANTHROPIC_API_KEY:
         print("ERROR: ANTHROPIC_API_KEY is not set. Create a .env file or export the variable.")
@@ -498,6 +503,7 @@ def main() -> None:
     num_factions = args.factions or random.randint(config.MIN_FACTIONS, config.MAX_FACTIONS)
     num_factions = max(config.MIN_FACTIONS, min(num_factions, len(IDEOLOGIES)))
     chosen_ideologies = random.sample(list(IDEOLOGIES.keys()), num_factions)
+    remaining_ideologies = [i for i in IDEOLOGIES.keys() if i not in chosen_ideologies]
 
     # Create timestamped run subfolder
     timestamp = datetime.now().strftime("%Y%m%d-%H%M")
@@ -517,6 +523,7 @@ def main() -> None:
     # Build state and factions
     state = SettlementState(name=args.settlement_name)
     state._data["challenge_difficulty"] = args.difficulty
+    state.set_available_ideologies(remaining_ideologies)
     faction_agents = []
     for i, ideology_name in enumerate(chosen_ideologies):
         faction_data = build_faction_data(ideology_name, i)
