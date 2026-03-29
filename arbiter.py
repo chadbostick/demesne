@@ -18,6 +18,16 @@ from mechanics.worldbuilding import CHALLENGE_EVENTS, BOON_TABLE
 from mechanics.cultures import CULTURE_TREE
 from mechanics.scoring import score_all_factions
 from mechanics.ideologies import IDEOLOGIES
+from mechanics.token_economy import (
+    pick_best_strategy, should_make_instead, pick_make_receive_distribution,
+    pick_bonus_colors, can_afford, deduct_tokens, affordable_upgrades,
+    apply_culture_economy, find_make_option_by_color,
+    CULTURE_ECONOMY_EFFECTS,
+)
+from mechanics.cooperation import (
+    cooperative_upgrades, score_coop_option, faction_benefits_from,
+    pick_preferred_option,
+)
 from state.memory import MemoryContext
 
 if TYPE_CHECKING:
@@ -30,25 +40,6 @@ if TYPE_CHECKING:
 
 
 # Economic effects of culture options
-CULTURE_ECONOMY_EFFECTS: dict = {
-    "Farming":        {"production": ["cultivated crops", "preserved grain"], "removes_scarcity": ["grain"]},
-    "Hunting":        {"production": ["dressed hides", "smoked meat"], "trade_goods": ["furs", "bone tools"]},
-    "Trading":        {"trade_goods": ["imported luxuries", "exotic spices"], "removes_scarcity": ["metal ore"]},
-    "Raiding":        {"trade_goods": ["plundered goods", "captured livestock"], "scarcity": ["trust with neighbors"]},
-    "Manufacturing":  {"production": ["finished goods", "textiles", "tools"], "trade_goods": ["manufactured exports"]},
-    "Mining":         {"production": ["refined ore", "gemstones", "coal"], "removes_scarcity": ["metal ore", "stone"]},
-    "Personal":       {"trade_goods": ["personal crafts"]},
-    "Communal":       {"production": ["communal stores"]},
-    "Barter":         {"trade_goods": ["bartered goods"]},
-    "Currency":       {"trade_goods": ["coined money"], "production": ["minted currency"]},
-    "Banking":        {"trade_goods": ["letters of credit", "bonds"], "production": ["banking services"]},
-    "Taxes":          {"production": ["tax revenue", "state reserves"]},
-    "Earth":          {"production": ["quarried stone", "clay works"], "removes_scarcity": ["stone"]},
-    "Water":          {"production": ["irrigation", "clean water"], "removes_scarcity": ["water"]},
-    "Air":            {"trade_goods": ["wind-powered goods"], "production": ["windmills"]},
-    "Fire":           {"production": ["forged metal", "kilns", "smelted ore"], "removes_scarcity": ["metal ore"]},
-}
-
 
 class Arbiter:
     """
@@ -411,10 +402,10 @@ class Arbiter:
 
             # ── Decide strategy ────────────────────────────────────────────
             # 1. Pick target goal (determines which purchase we're working toward)
-            strategy, color, pursuit_reason = self._pick_best_strategy(faction, state)
+            strategy, color, pursuit_reason = pick_best_strategy(faction, state)
 
             # 2. Check if make exchange enables that goal's next purchase
-            make_override = self._should_make_instead(faction, state)
+            make_override = should_make_instead(faction, state)
             if make_override:
                 stance = "make"
                 color = make_override["exchange_color"]
@@ -436,12 +427,12 @@ class Arbiter:
 
             # Make stance: attempt exchange first, fall back to normal if insufficient
             if stance == "make":
-                make_opt = self._find_make_option_by_color(color)
+                make_opt = find_make_option_by_color(color)
                 if make_opt:
                     give = _make_give or tokens.get(color, 0)  # use calculated amount, or all if no override
                     receive = make_receive_for_level(color_level, give)
                     if give >= 1:
-                        receive_colors = self._pick_make_receive_distribution(
+                        receive_colors = pick_make_receive_distribution(
                             faction, tokens, color, receive, state
                         )
                         tokens = apply_make_exchange(tokens, color, give, receive, receive_colors)
@@ -518,7 +509,7 @@ class Arbiter:
                 else f"{len(all_rolls)}d20 {all_rolls}"
             )
             if bonus_count > 0:
-                bonus_colors = self._pick_bonus_colors(faction, tokens, color, bonus_count, state)
+                bonus_colors = pick_bonus_colors(faction, tokens, color, bonus_count, state)
                 tokens = award_tokens(tokens, color, base_count, bonus_count, bonus_colors)
                 bonus_note = f" + {bonus_count} " + ", ".join(bonus_colors)
             else:
@@ -570,48 +561,6 @@ class Arbiter:
 
         return outputs
 
-    def _stance_to_strategy(
-        self, stance: str, faction: dict, state: "SettlementState"
-    ) -> tuple[str, str]:
-        """Map a strategic stance to (strategy_name, token_color)."""
-        color_to_strat = {v["token_color"]: k for k, v in BASE_STRATEGIES.items()}
-        goals = faction.get("goals", {})
-
-        def color_for_cat(cat: str) -> str:
-            return CULTURE_STRATEGY_COLOR.get(cat, "red")
-
-        def strat_for_color(c: str) -> str:
-            return color_to_strat.get(c, "pray")
-
-        if stance == "pursue_primary":
-            cat = goals.get("primary", {}).get("category", "spirituality")
-        elif stance == "pursue_secondary":
-            secs = goals.get("secondary", [])
-            cat = secs[0].get("category", "spirituality") if secs else "spirituality"
-        elif stance == "pursue_tertiary":
-            cat = goals.get("tertiary", {}).get("category", "spirituality")
-        elif stance == "coordinate":
-            return "pray", "red"
-        elif stance == "oppose":
-            leader_name = state.leading_faction
-            if leader_name:
-                leader_f = state.get_faction(leader_name)
-                leader_cat = leader_f.get("goals", {}).get("primary", {}).get("category", "spirituality")
-                leader_color = color_for_cat(leader_cat)
-                alt = next(
-                    (c for c in ["red", "blue", "green", "orange", "pink"] if c != leader_color),
-                    "blue",
-                )
-                return strat_for_color(alt), alt
-            return "pray", "red"
-        elif stance == "make":
-            cat = goals.get("primary", {}).get("category", "spirituality")
-        else:
-            return "pray", "red"
-
-        color = color_for_cat(cat)
-        return strat_for_color(color), color
-
     def _extract_historical_figure(self, text: str, faction: str, era: int, role: str) -> dict | None:
         """Extract a historical figure from narration text containing 'HISTORICAL FIGURE: name — deed'."""
         import re
@@ -628,409 +577,6 @@ class Arbiter:
             return figure
         return None
 
-    def _pick_best_strategy(
-        self, faction: dict, state: "SettlementState"
-    ) -> tuple[str, str, str]:
-        """
-        Smart goal pursuit with coalition awareness and sticky targeting.
-
-        Returns (strategy_name, color, reason).
-
-        Sticky behavior: once a faction starts pursuing a color, they stay
-        on it until the shortfall is covered, unless a dramatically better
-        opportunity emerges (>3 tokens closer).
-        """
-        from mechanics.faction_utils import compute_goal_costs
-        tokens = dict(faction["tokens"])
-        goals = faction.get("goals", {})
-        cultures = state.cultures
-        coalition_plan = faction.get("coalition_plan", {})
-        coalition_cats = {c["category"]: c for c in coalition_plan.get("coalitions", [])}
-
-        # Recompute costs against current culture state
-        goal_costs = compute_goal_costs(goals, cultures)
-        faction["goal_costs"] = goal_costs
-
-        color_to_strat = {v["token_color"]: k for k, v in BASE_STRATEGIES.items()}
-
-        # Evaluate all goals
-        candidates: list[dict] = []
-        for goal_key in ["primary", "secondary_0", "secondary_1", "tertiary"]:
-            goal_data = goal_costs.get(goal_key)
-            if not goal_data or not goal_data.get("remaining_levels"):
-                continue
-
-            cat = goal_data["category"]
-            next_lvl = goal_data["remaining_levels"][0]
-
-            from mechanics.cultures import get_cost, can_purchase
-            if not can_purchase(cat, next_lvl, cultures):
-                continue
-            cost = get_cost(cat, next_lvl)
-
-            # Compute per-color shortfalls
-            shortfalls: dict[str, int] = {}
-            total_short = 0
-            for c, needed in cost.items():
-                have = tokens.get(c, 0)
-                short = max(0, needed - have)
-                total_short += short
-                if short > 0:
-                    shortfalls[c] = short
-
-            if total_short == 0:
-                continue
-
-            # Coalition bonus
-            effective_short = total_short
-            coalition = coalition_cats.get(cat)
-            if coalition:
-                num_allies = len(coalition["allies"])
-                coalition_discount = min(total_short - 1, num_allies)
-                effective_short = max(1, total_short - coalition_discount)
-                suffix = f" (coalition: {num_allies} allies)"
-            else:
-                suffix = " (solo)"
-
-            # Pick the color with the biggest shortfall for this goal
-            worst_color = max(shortfalls, key=shortfalls.get) if shortfalls else None
-            if worst_color:
-                candidates.append({
-                    "goal_key": goal_key,
-                    "category": cat,
-                    "level": next_lvl,
-                    "color": worst_color,
-                    "shortfall": shortfalls[worst_color],
-                    "total_short": total_short,
-                    "effective_short": effective_short,
-                    "suffix": suffix,
-                })
-
-        if not candidates:
-            # Fallback
-            aggregate = goal_costs.get("aggregate", {})
-            if aggregate:
-                biggest_gap_color = max(
-                    aggregate.keys(),
-                    key=lambda c: max(0, aggregate[c] - tokens.get(c, 0))
-                )
-                if biggest_gap_color in color_to_strat:
-                    return color_to_strat[biggest_gap_color], biggest_gap_color, "aggregate need"
-            return "pray", "red", "fallback"
-
-        # Sort by effective shortfall (closest goal first)
-        candidates.sort(key=lambda c: c["effective_short"])
-        best = candidates[0]
-
-        # Sticky targeting: if faction was pursuing a color last era,
-        # stay on it unless the best candidate is dramatically better
-        current_pursuit = faction.get("_current_pursuit", {})
-        current_color = current_pursuit.get("color")
-        current_goal = current_pursuit.get("goal_key")
-
-        if current_color and current_color in color_to_strat:
-            # Find the current pursuit in candidates
-            current_candidate = next(
-                (c for c in candidates if c["color"] == current_color), None
-            )
-            if current_candidate:
-                # Stay on current unless best is >3 tokens closer
-                improvement = current_candidate["effective_short"] - best["effective_short"]
-                if improvement <= 3:
-                    # Stick with current
-                    faction["_current_pursuit"] = {"color": current_color, "goal_key": current_candidate["goal_key"]}
-                    strategy = color_to_strat[current_color]
-                    reason = (
-                        f"{current_candidate['goal_key']}: {current_candidate['category']} "
-                        f"L{current_candidate['level']} short {current_candidate['total_short']}"
-                        f"{current_candidate['suffix']} [STAYING COURSE]"
-                    )
-                    return strategy, current_color, reason
-
-        # Switch to best target
-        faction["_current_pursuit"] = {"color": best["color"], "goal_key": best["goal_key"]}
-        strategy = color_to_strat.get(best["color"], "pray")
-        reason = (
-            f"{best['goal_key']}: {best['category']} L{best['level']} "
-            f"short {best['total_short']}{best['suffix']}"
-        )
-        return strategy, best["color"], reason
-
-    def _pick_bonus_colors(
-        self, faction: dict, tokens: dict, base_color: str,
-        bonus_count: int, state: "SettlementState"
-    ) -> list[str]:
-        """
-        Pick colors for bonus tokens (from rolling a 20).
-        Fills the biggest goal-relevant shortfalls first, excluding the base color
-        since the faction is already earning that.
-        """
-        _all_colors = ["red", "blue", "green", "orange", "pink"]
-        goals = faction.get("goals", {})
-        cultures = state.cultures
-
-        # Simulate tokens after base award
-        sim_tokens = dict(tokens)
-        sim_tokens[base_color] = sim_tokens.get(base_color, 0)  # base not added yet but we want other colors
-
-        # Collect shortfalls across goal-relevant purchases
-        shortfalls: dict[str, int] = {}
-        target_cats = []
-        p = goals.get("primary", {})
-        if p.get("category"):
-            target_cats.append(p["category"])
-        for s in goals.get("secondary", []):
-            if s.get("category"):
-                target_cats.append(s["category"])
-        t = goals.get("tertiary", {})
-        if t.get("category"):
-            target_cats.append(t["category"])
-
-        for cat in target_cats:
-            cat_data = cultures.get(cat, {})
-            next_lvl = cat_data.get("level", 0) + 1
-            if next_lvl > 3 or not can_purchase(cat, next_lvl, cultures):
-                continue
-            cost = get_cost(cat, next_lvl)
-            for c, needed in cost.items():
-                if c == base_color:
-                    continue
-                short = needed - sim_tokens.get(c, 0)
-                if short > 0:
-                    shortfalls[c] = max(shortfalls.get(c, 0), short)
-
-        # Fill bonus tokens from largest shortfall first
-        result: list[str] = []
-        remaining = bonus_count
-        for c, short in sorted(shortfalls.items(), key=lambda x: x[1], reverse=True):
-            if remaining <= 0:
-                break
-            take = min(short, remaining)
-            result.extend([c] * take)
-            remaining -= take
-
-        # If still remaining, pick the color with the largest shortfall that isn't base
-        if remaining > 0:
-            fallback = next(
-                (c for c in sorted(shortfalls, key=lambda c: shortfalls[c], reverse=True)),
-                next(c for c in _all_colors if c != base_color),
-            )
-            result.extend([fallback] * remaining)
-
-        return result
-
-    def _apply_culture_economy(self, state: "SettlementState", option: str) -> None:
-        """Apply economic effects when a culture option is purchased."""
-        effects = CULTURE_ECONOMY_EFFECTS.get(option, {})
-        for item in effects.get("production", []):
-            state.add_production(item)
-        for item in effects.get("trade_goods", []):
-            state.add_trade_good(item)
-        for item in effects.get("scarcity", []):
-            state.add_scarcity(item)
-        for item in effects.get("removes_scarcity", []):
-            state.remove_scarcity(item)
-
-    def _future_path_cost(self, category: str, cultures: dict) -> dict[str, int]:
-        """
-        Total token cost for all remaining levels in a category.
-        E.g. if category is at L0, sums costs for L1 + L2 + L3.
-        """
-        current_level = cultures.get(category, {}).get("level", 0)
-        total: dict[str, int] = {}
-        for lvl in range(current_level + 1, 4):
-            cost = get_cost(category, lvl)
-            for c, n in cost.items():
-                total[c] = total.get(c, 0) + n
-        return total
-
-    def _next_level_needs(self, faction: dict, state: "SettlementState") -> dict[str, int]:
-        """
-        Compute tokens needed for the NEXT purchasable level of each goal category.
-        Only reserves for immediate next purchases, not the entire remaining path.
-        """
-        goals = faction.get("goals", {})
-        cultures = state.cultures
-        needs: dict[str, int] = {}
-
-        target_cats = []
-        p = goals.get("primary", {})
-        if p.get("category"):
-            target_cats.append(p["category"])
-        for s in goals.get("secondary", []):
-            if s.get("category"):
-                target_cats.append(s["category"])
-        t = goals.get("tertiary", {})
-        if t.get("category"):
-            target_cats.append(t["category"])
-
-        for cat in target_cats:
-            cat_data = cultures.get(cat, {})
-            next_lvl = cat_data.get("level", 0) + 1
-            if next_lvl > 3:
-                continue
-            cost = get_cost(cat, next_lvl)
-            for c, n in cost.items():
-                needs[c] = needs.get(c, 0) + n
-        return needs
-
-    def _should_make_instead(self, faction: dict, state: "SettlementState") -> dict | None:
-        """
-        Check if the faction should override to a make exchange.
-        Returns {"reason", "exchange_color", "receive_color", "give"} or None.
-
-        Only reserves tokens needed for the SINGLE most achievable goal's
-        next level — not all goals combined. A faction pursuing production L3
-        that also needs values L2 and property L1 only reserves for whichever
-        is closest, leaving the rest available for exchange.
-        """
-        tokens = dict(faction["tokens"])
-        goals = faction.get("goals", {})
-        cultures = state.cultures
-
-        # Collect goal-relevant categories
-        target_cats: list[tuple[str, str]] = []
-        p = goals.get("primary", {})
-        if p.get("category"):
-            target_cats.append((p["category"], f"primary goal ({p.get('option', '?')})"))
-        for s in goals.get("secondary", []):
-            if s.get("category"):
-                target_cats.append((s["category"], f"secondary goal ({s.get('option', '?')})"))
-        t = goals.get("tertiary", {})
-        if t.get("category"):
-            target_cats.append((t["category"], f"tertiary goal ({t['category']})"))
-
-        for cat, reason in target_cats:
-            cat_data = cultures.get(cat, {})
-            next_lvl = cat_data.get("level", 0) + 1
-            if next_lvl > 3 or not can_purchase(cat, next_lvl, cultures):
-                continue
-
-            cost = get_cost(cat, next_lvl)
-
-            # Find colors we're short on for the NEXT level
-            shortfall: dict[str, int] = {}
-            for c, needed in cost.items():
-                have = tokens.get(c, 0)
-                if have < needed:
-                    shortfall[c] = needed - have
-
-            if not shortfall:
-                continue
-
-            for short_color, short_amount in shortfall.items():
-                for surplus_color in ["red", "blue", "green", "orange", "pink"]:
-                    if surplus_color == short_color:
-                        continue
-
-                    have = tokens.get(surplus_color, 0)
-
-                    # Only reserve what THIS purchase needs of this color
-                    reserved = cost.get(surplus_color, 0)
-                    exchangeable = have - reserved
-
-                    # Only make when there's genuine excess — more tokens of this
-                    # color than the faction needs for the target purchase.
-                    # Threshold: at least 2 excess at L0 (1:1 barely helps),
-                    # at least 1 excess at L1+ (multiplier makes even 1 worthwhile
-                    # since received tokens can now be split across colors)
-                    color_level = state.get_color_level(surplus_color)
-                    min_excess = 1 if color_level >= 1 else 2
-                    if exchangeable < min_excess:
-                        continue
-
-                    multiplier = color_level + 1
-
-                    min_give = (short_amount + multiplier - 1) // multiplier
-                    give = min(min_give, exchangeable)
-                    receive = make_receive_for_level(color_level, give)
-
-                    if receive >= short_amount:
-                        return {
-                            "reason": (
-                                f"exchange {give} {surplus_color} (surplus beyond next purchases) → "
-                                f"{receive} {short_color} to cover {cat} L{next_lvl} "
-                                f"shortfall ({reason})"
-                            ),
-                            "exchange_color": surplus_color,
-                            "receive_color": short_color,
-                            "give": give,
-                        }
-
-        return None
-
-    def _pick_make_receive_distribution(
-        self, faction: dict, tokens: dict, exchange_color: str,
-        receive_count: int, state: "SettlementState"
-    ) -> list[str]:
-        """
-        Distribute received tokens across colors to cover goal shortfalls.
-        Each received token can be a different color. Fills biggest shortfalls first.
-        """
-        _all_colors = ["red", "blue", "green", "orange", "pink"]
-        goals = faction.get("goals", {})
-        cultures = state.cultures
-
-        # Simulate tokens after the exchange (the give color will be spent)
-        sim_tokens = dict(tokens)
-        sim_tokens[exchange_color] = 0
-
-        # Collect shortfalls across all goal-relevant next-level purchases
-        shortfalls: dict[str, int] = {}
-        target_cats = []
-        p = goals.get("primary", {})
-        if p.get("category"):
-            target_cats.append(p["category"])
-        for s in goals.get("secondary", []):
-            if s.get("category"):
-                target_cats.append(s["category"])
-        t = goals.get("tertiary", {})
-        if t.get("category"):
-            target_cats.append(t["category"])
-
-        for cat in target_cats:
-            cat_data = cultures.get(cat, {})
-            next_lvl = cat_data.get("level", 0) + 1
-            if next_lvl > 3 or not can_purchase(cat, next_lvl, cultures):
-                continue
-            cost = get_cost(cat, next_lvl)
-            for c, needed in cost.items():
-                if c == exchange_color:
-                    continue
-                short = needed - sim_tokens.get(c, 0)
-                if short > 0:
-                    shortfalls[c] = max(shortfalls.get(c, 0), short)
-
-        # Fill received tokens: biggest shortfalls first
-        result: list[str] = []
-        remaining = receive_count
-
-        for c, short in sorted(shortfalls.items(), key=lambda x: x[1], reverse=True):
-            if remaining <= 0:
-                break
-            take = min(short, remaining)
-            result.extend([c] * take)
-            sim_tokens[c] = sim_tokens.get(c, 0) + take
-            remaining -= take
-
-        # If still remaining, pick the color with the largest overall need
-        if remaining > 0:
-            fallback = next(
-                (c for c in sorted(shortfalls, key=lambda c: shortfalls[c], reverse=True) if c != exchange_color),
-                next((c for c in _all_colors if c != exchange_color), "red"),
-            )
-            result.extend([fallback] * remaining)
-
-        return result
-
-    def _find_make_option_by_color(self, color: str) -> dict | None:
-        for opt in BASE_MAKE_OPTIONS.values():
-            if opt["exchange_color"] == color:
-                return opt
-        return None
-
-    # ── Investment Phase ──────────────────────────────────────────────────────
-
     def _run_investment_phase(self, state: "SettlementState") -> list[dict]:
         print(f"\n  ── Growth and Development ──")
         outputs = []
@@ -1040,7 +586,7 @@ class Arbiter:
             faction = state.get_faction(fname)
             tokens = dict(faction["tokens"])
 
-            affordable = self._affordable_upgrades(tokens, state.cultures)
+            affordable = affordable_upgrades(tokens, state.cultures)
             if not affordable:
                 self._vprint(f"\n    [SKIP: {fname} cannot afford any upgrade]")
                 continue
@@ -1066,7 +612,7 @@ class Arbiter:
                     continue
 
                 cost = get_cost(cat, lvl)
-                if not self._can_afford(tokens, cost):
+                if not can_afford(tokens, cost):
                     self._vprint(f"      [SKIP: cannot afford {cat} L{lvl}]")
                     continue
 
@@ -1075,9 +621,9 @@ class Arbiter:
                     self._vprint(f"      [SKIP: '{option}' not valid for {cat} L{lvl}]")
                     continue
 
-                tokens = self._deduct_tokens(tokens, cost)
+                tokens = deduct_tokens(tokens, cost)
                 state.apply_culture_upgrade(cat, lvl, option)
-                self._apply_culture_economy(state, option)
+                apply_culture_economy(state, option)
                 self._vprint(f"      [UNLOCKED: {cat} L{lvl} — {option}]")
                 purchased_any = True
                 any_purchase_made = True
@@ -1364,30 +910,6 @@ class Arbiter:
         rank = {name: i for i, name in enumerate(order)}
         return sorted(self._factions, key=lambda a: rank.get(a.faction_data["name"], len(order)))
 
-    def _can_afford(self, tokens: dict, cost: dict) -> bool:
-        return all(tokens.get(c, 0) >= n for c, n in cost.items())
-
-    def _deduct_tokens(self, tokens: dict, cost: dict) -> dict:
-        t = dict(tokens)
-        for c, n in cost.items():
-            t[c] = t.get(c, 0) - n
-        return t
-
-    def _affordable_upgrades(self, tokens: dict, cultures: dict) -> list[dict]:
-        """Return list of upgrades this faction can afford right now."""
-        affordable = []
-        for cat, cat_data in cultures.items():
-            next_lvl = cat_data["level"] + 1
-            if next_lvl > 3:
-                continue
-            if not can_purchase(cat, next_lvl, cultures):
-                continue
-            cost = get_cost(cat, next_lvl)
-            if self._can_afford(tokens, cost):
-                for opt in CULTURE_TREE[cat]["levels"][next_lvl]["options"]:
-                    affordable.append({"category": cat, "level": next_lvl, "option": opt, "cost": cost})
-        return affordable
-
     def _attempt_cooperative_purchases(self, state: "SettlementState") -> bool:
         """
         After individual investments, attempt to pool tokens across all factions for
@@ -1398,7 +920,7 @@ class Arbiter:
         made_any = False
 
         while True:
-            coop = self._cooperative_upgrades(state.factions, state.cultures)
+            coop = cooperative_upgrades(state.factions, state.cultures)
             if not coop:
                 if not made_any:
                     self._vprint(f"    No cooperative opportunities this era.")
@@ -1429,14 +951,14 @@ class Arbiter:
                 # Find both options for this category+level
                 options_at_level = [i for i in coop if i["category"] == item["category"] and i["level"] == item["level"]]
                 if len(options_at_level) == 2:
-                    best = self._pick_preferred_option(options_at_level, state.factions)
+                    best = pick_preferred_option(options_at_level, state.factions)
                     unique_opps.append(best)
                 else:
                     unique_opps.append(item)
 
             # Sort by faction goal alignment — highest score first
             unique_opps.sort(
-                key=lambda o: self._score_coop_option(o, state.factions), reverse=True
+                key=lambda o: score_coop_option(o, state.factions), reverse=True
             )
             self._vprint(f"    Attempting {len(unique_opps)} unique category/level combinations (highest alignment first):")
 
@@ -1447,8 +969,8 @@ class Arbiter:
                 other_option = next(
                     (o for o in CULTURE_TREE[cat]["levels"][lvl]["options"] if o != option), "?"
                 )
-                score = self._score_coop_option(opp, state.factions)
-                other_score = self._score_coop_option(
+                score = score_coop_option(opp, state.factions)
+                other_score = score_coop_option(
                     {"category": cat, "level": lvl, "option": other_option}, state.factions
                 )
                 self._vprint(f"\n    Evaluating: {cat} L{lvl} — {option} (costs {cost_str})")
@@ -1462,7 +984,7 @@ class Arbiter:
                 willing_factions = []
                 for f in state.factions:
                     tok_str = ", ".join(f"{c}:{n}" for c, n in f["tokens"].items() if n > 0) or "none"
-                    benefits = self._faction_benefits_from(f, cat)
+                    benefits = faction_benefits_from(f, cat)
                     if not benefits:
                         status = "unwilling (not their goal)"
                         self._vprint(f"      {f['name']}: [{tok_str}] — {status}")
@@ -1525,7 +1047,7 @@ class Arbiter:
                     state.update_faction_tokens(fname, tokens)
 
                 state.apply_culture_upgrade(cat, lvl, option)
-                self._apply_culture_economy(state, option)
+                apply_culture_economy(state, option)
                 state.unlock_strategy(f"{cat}_strategy")
                 state.unlock_make_option(f"{cat}_make")
                 made_any = True
@@ -1574,112 +1096,6 @@ class Arbiter:
                 break
 
         return made_any
-
-    def _cooperative_upgrades(self, factions: list[dict], cultures: dict) -> list[dict]:
-        """Return upgrades that willing factions can afford together but not alone.
-        Factions with antithesis preference for a specific option are excluded from
-        that option's pool (they won't fund something they oppose)."""
-        coop = []
-        for cat, cat_data in cultures.items():
-            next_lvl = cat_data["level"] + 1
-            if next_lvl > 3:
-                continue
-            if not can_purchase(cat, next_lvl, cultures):
-                continue
-            cost = get_cost(cat, next_lvl)
-
-            # Only consider factions that benefit from this category
-            cat_willing = [f for f in factions if self._faction_benefits_from(f, cat)]
-            if not cat_willing:
-                continue
-
-            for opt in CULTURE_TREE[cat]["levels"][next_lvl]["options"]:
-                # Further filter: exclude factions whose preference is antithesis
-                willing = [
-                    f for f in cat_willing
-                    if f.get("culture_preferences", {}).get(cat, {}).get(next_lvl, {}).get(opt, "indifferent") != "antithesis"
-                ]
-                if not willing:
-                    continue
-
-                # Sum willing factions' tokens
-                willing_combined: dict = {}
-                for f in willing:
-                    for c, n in f["tokens"].items():
-                        willing_combined[c] = willing_combined.get(c, 0) + n
-
-                # Affordable by willing factions combined, not by any single one
-                if not self._can_afford(willing_combined, cost):
-                    continue
-                if any(self._can_afford(dict(f["tokens"]), cost) for f in willing):
-                    continue
-                coop.append({"category": cat, "level": next_lvl, "option": opt, "cost": cost})
-        return coop
-
-    def _score_coop_option(self, opt: dict, factions: list[dict]) -> int:
-        """Score a culture option based on faction goal alignment.
-        Scores both direct option matches AND category-path alignment
-        (a faction benefits from any purchase in a category they need)."""
-        option_name = opt["option"].lower()
-        cat = opt["category"]
-        score = 0
-        for f in factions:
-            goals = f.get("goals", {})
-            p = goals.get("primary", {})
-            if p.get("category") == cat:
-                if p.get("option", "").lower() == option_name:
-                    score += 3  # direct goal match
-                elif p.get("enemy_option", "").lower() == option_name:
-                    score -= 2  # enemy option
-                else:
-                    score += 2  # category on primary path (prerequisite)
-            for s in goals.get("secondary", []):
-                if s.get("category") == cat:
-                    if s.get("option", "").lower() == option_name:
-                        score += 2
-                    elif s.get("enemy_option", "").lower() == option_name:
-                        score -= 1
-                    else:
-                        score += 1  # category on secondary path
-            t = goals.get("tertiary", {})
-            if t.get("category") == cat:
-                score += 1
-        return score
-
-    def _faction_benefits_from(self, faction: dict, category: str) -> bool:
-        """Check if a faction has this category in any of their goals."""
-        goals = faction.get("goals", {})
-        p = goals.get("primary", {})
-        if p.get("category") == category:
-            return True
-        for s in goals.get("secondary", []):
-            if s.get("category") == category:
-                return True
-        t = goals.get("tertiary", {})
-        if t.get("category") == category:
-            return True
-        return False
-
-    def _pick_preferred_option(self, options: list[dict], factions: list[dict]) -> dict:
-        """
-        Given two cooperative purchase options for the same category+level,
-        pick the one with more faction goal support. Falls back to random on tie.
-        """
-        scored = [(opt, self._score_coop_option(opt, factions)) for opt in options]
-        scored.sort(key=lambda x: x[1], reverse=True)
-
-        opt_a, score_a = scored[0]
-        opt_b, score_b = scored[1] if len(scored) > 1 else (None, 0)
-
-        self._vprint(f"      [Option scoring: {opt_a['option']}={score_a}, {opt_b['option'] if opt_b else '?'}={score_b}]")
-
-        if score_a == score_b:
-            choice = random.choice(options)
-            self._vprint(f"      [Tie — randomly chose {choice['option']}]")
-            return choice
-        return opt_a
-
-    # ── Challenge Phase ───────────────────────────────────────────────────────
 
     def _run_challenge_phase(self, state: "SettlementState") -> list[dict]:
         print(f"\n  ── A Challenge Arises ──")
@@ -1938,7 +1354,7 @@ class Arbiter:
                 base, bonus = lookup_payout(r)
                 earned = base + bonus
                 if earned > 0:
-                    reward_color = self._pick_bonus_colors(leader_faction, leader_tokens_dict, "", 1, state)[0]
+                    reward_color = pick_bonus_colors(leader_faction, leader_tokens_dict, "", 1, state)[0]
                     leader_tokens_dict[reward_color] = leader_tokens_dict.get(reward_color, 0) + earned
                     self._vprint(f"    [{leading_name} rolled {r} → +{earned} {reward_color}]")
             state.update_faction_tokens(leading_name, leader_tokens_dict)
@@ -1956,7 +1372,7 @@ class Arbiter:
                 base, bonus = lookup_payout(r)
                 earned = base + bonus
                 if earned > 0:
-                    reward_color = self._pick_bonus_colors(f, f_tokens, "", 1, state)[0]
+                    reward_color = pick_bonus_colors(f, f_tokens, "", 1, state)[0]
                     f_tokens[reward_color] = f_tokens.get(reward_color, 0) + earned
                     self._vprint(f"    [{fname} rolled {r} → +{earned} {reward_color}]")
                     state.update_faction_tokens(fname, f_tokens)
