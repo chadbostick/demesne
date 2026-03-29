@@ -227,14 +227,32 @@ class Arbiter:
         init_roll = roll(20)
         faction_data["influence"] = init_roll
 
-        # Starting token bonus: 1d3-1 per era elapsed (late arrivals bring resources)
-        _all_colors = ["red", "blue", "green", "orange", "pink"]
+        # Starting token bonus: 1d3-1 per era elapsed, distributed toward goal needs
         bonus_per_era = max(0, roll(3) - 1)
         total_bonus = bonus_per_era * state.era
         if total_bonus > 0:
-            for _ in range(total_bonus):
-                c = random.choice(_all_colors)
-                faction_data["tokens"][c] = faction_data["tokens"].get(c, 0) + 1
+            # Compute which colors this faction actually needs
+            from main import compute_goal_costs
+            goal_costs = compute_goal_costs(faction_data["goals"], state.cultures)
+            needed_colors: dict[str, int] = {}
+            for goal_key in ["primary", "secondary_0", "secondary_1", "tertiary"]:
+                gd = goal_costs.get(goal_key, {})
+                for c, n in gd.get("total_cost", {}).items():
+                    needed_colors[c] = needed_colors.get(c, 0) + n
+            # Distribute tokens weighted toward needed colors
+            if needed_colors:
+                # Build weighted pool: each needed color appears proportionally
+                weighted_pool = []
+                for c, n in needed_colors.items():
+                    weighted_pool.extend([c] * max(1, n))
+                for _ in range(total_bonus):
+                    c = random.choice(weighted_pool)
+                    faction_data["tokens"][c] = faction_data["tokens"].get(c, 0) + 1
+            else:
+                _all_colors = ["red", "blue", "green", "orange", "pink"]
+                for _ in range(total_bonus):
+                    c = random.choice(_all_colors)
+                    faction_data["tokens"][c] = faction_data["tokens"].get(c, 0) + 1
             self._vprint(f"    [Starting bonus: {total_bonus} tokens ({bonus_per_era}/era × {state.era} eras)]")
 
         # Add to state
