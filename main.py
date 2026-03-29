@@ -100,8 +100,12 @@ Example: ["A crystalline moss that grows only in caves where echoes never fade",
             messages=[{"role": "user", "content": prompt}],
         )
         raw = message.content[0].text.strip()
-        # Parse JSON array
+        # Strip markdown code fences if present
         import json as _json
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+            if raw.endswith("```"):
+                raw = raw[:-3].strip()
         seeds = _json.loads(raw)
         if isinstance(seeds, list) and len(seeds) >= 7:
             return title, seeds[:7]
