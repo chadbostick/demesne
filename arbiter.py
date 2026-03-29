@@ -1436,6 +1436,7 @@ class Arbiter:
             previous_chronicle=prev_chron,
             strategy_summary=strat_sum,
             previous_challenges=list(self._previous_challenges) if self._previous_challenges else None,
+            inspiration=getattr(self, "_era_inspiration", None),
         )
         self._vprint(" done.\n")
         challenge_text = gm_challenge.content
@@ -1810,7 +1811,6 @@ class Arbiter:
             getattr(self, "_last_challenge_result", {}),
             previous_era_names=list(self._era_names),
             previous_chronicles=list(self._era_chronicle),
-            inspiration=getattr(self, "_era_inspiration", None),
         )
         self._vprint(" done.\n")
         print(gm_output.content)
