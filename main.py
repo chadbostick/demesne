@@ -409,7 +409,7 @@ def write_final_summary(output_dir: str, state: SettlementState, all_actions: li
         json.dump({"state": state.to_dict(), "events": all_events}, f, indent=2)
 
     # Phases to exclude from narrative (mechanical, not story)
-    _MECHANICAL_PHASES = {"strategy", "investment", "rename_strategy", "historical_figure"}
+    _MECHANICAL_PHASES = {"strategy", "investment", "rename_strategy", "historical_figure", "make_structure", "place_naming"}
 
     def _clean_narrative(text: str) -> str:
         """Strip XML tags and JSON blocks from LLM output for narrative file."""

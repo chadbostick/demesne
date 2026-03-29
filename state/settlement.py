@@ -429,12 +429,15 @@ class SettlementState:
 
         return "\n".join(lines)
 
+    _TIER_NAMES = {0: "undeveloped", 1: "foundational", 2: "established", 3: "dominant"}
+
     def culture_summary(self) -> str:
-        lines = ["Culture levels:"]
+        lines = ["Culture development:"]
         for cat, data in self._data["cultures"].items():
             lvl = data["level"]
+            tier = self._TIER_NAMES.get(lvl, str(lvl))
             opts = ", ".join(data["options_chosen"]) if data["options_chosen"] else "none"
-            lines.append(f"  {cat}: L{lvl} [{opts}]")
+            lines.append(f"  {cat}: {tier} [{opts}]")
         return "\n".join(lines)
 
     def faction_summary(self) -> str:

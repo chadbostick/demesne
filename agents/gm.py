@@ -372,20 +372,4 @@ VOICE CONSTRAINT: No tokens, rolls, victory points, or game mechanics.
 """
         return self._call_llm(prompt, round_num, "strategy_summary", max_tokens=1024)
 
-    def _call_llm(self, prompt: str, round_num: int, phase: str, max_tokens: int = 1024) -> AgentOutput:
-        import anthropic
-        import config
-        client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-        message = client.messages.create(
-            model=config.MODEL,
-            max_tokens=max_tokens,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        raw = message.content[0].text
-        return AgentOutput(
-            agent_role=self.role,
-            phase=phase,
-            round=round_num,
-            content=raw,
-            state_patch={},
-        )
+    # _call_llm inherited from BaseAgent

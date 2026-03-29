@@ -501,7 +501,7 @@ victory points, or any metagame concepts. Describe a real place in a real world.
 
 Nothing else.
 """
-        return self._call_llm(prompt, era, "make_structure", max_tokens=256)
+        return self._call_llm(prompt, era, "make_structure", max_tokens=384)
 
     def parse_make_structure(self, output: "AgentOutput") -> dict:
         """Extract make_structure JSON. Returns {} on failure."""
@@ -584,22 +584,7 @@ Write as history, not a turn report.
 """
         return self._call_llm(prompt, era, "strategy_narrative", max_tokens=512)
 
-    def _call_llm(self, prompt: str, round_num: int, phase: str, max_tokens: int = 1024) -> AgentOutput:
-        import anthropic
-        import config
-        client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-        message = client.messages.create(
-            model=config.MODEL,
-            max_tokens=max_tokens,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        raw = message.content[0].text
-        return AgentOutput(
-            agent_role=self.role,
-            phase=phase,
-            round=round_num,
-            content=raw,
-        )
+    # _call_llm inherited from BaseAgent
 
     def run_rename_strategy(
         self,
@@ -666,7 +651,7 @@ Output your choice in this exact format:
 
 Nothing else.
 """
-        return self._call_llm(prompt, era, "rename_strategy", max_tokens=128)
+        return self._call_llm(prompt, era, "rename_strategy", max_tokens=256)
 
     def introduce_faction(
         self, location: str, terrain: str, neighbor_factions: list[dict],
@@ -856,7 +841,7 @@ Output in this exact format:
 
 Nothing else.
 """
-        return self._call_llm(prompt, era, "place_naming", max_tokens=256)
+        return self._call_llm(prompt, era, "place_naming", max_tokens=384)
 
     def parse_place_name(self, output: "AgentOutput") -> dict:
         match = re.search(r"<place_name>(.*?)</place_name>", output.content, re.DOTALL)
