@@ -75,10 +75,22 @@ class Arbiter:
         self._last_faction_narratives: dict[str, str] = {}  # faction_name → last narrative
         self._previous_challenges: list[str] = []  # challenge events from past eras
 
-    def _try_add_faction(self, state: "SettlementState", trigger: str) -> None:
+    def _try_add_faction(self, state: "SettlementState", trigger: str, culture_level: int = 0) -> None:
         """Attempt to add a new faction if the trigger matches the configured mode."""
         if config.ADD_FACTIONS_MODE != trigger:
             return
+        # perLevel: only trigger on FIRST time settlement reaches L1, L2, or L3
+        if trigger == "perLevel":
+            milestones = state._data.setdefault("_level_milestones_triggered", set())
+            # Convert to set if loaded from JSON as list
+            if isinstance(milestones, list):
+                milestones = set(milestones)
+                state._data["_level_milestones_triggered"] = milestones
+            if culture_level in milestones or culture_level < 1:
+                return
+            milestones.add(culture_level)
+            # Store as list for JSON serialization
+            state._data["_level_milestones_triggered"] = list(milestones)
         ideology = state.pop_available_ideology()
         if not ideology:
             return
@@ -922,7 +934,7 @@ class Arbiter:
                 self._logger.log_event("culture_purchase", era=state.era,
                     faction=fname, category=cat, level=lvl, option=option,
                     cost=cost, tokens_after=dict(tokens), cooperative=False)
-                self._try_add_faction(state, "perLevel")
+                self._try_add_faction(state, "perLevel", culture_level=lvl)
 
                 new_strat = f"{cat}_strategy"
                 new_make = f"{cat}_make"
@@ -1367,7 +1379,7 @@ class Arbiter:
                 state.unlock_make_option(f"{cat}_make")
                 made_any = True
                 bought_one = True
-                self._try_add_faction(state, "perLevel")
+                self._try_add_faction(state, "perLevel", culture_level=lvl)
 
                 contribs = "; ".join(
                     f"{fn}: " + ", ".join(f"{n} {c}" for c, n in cols.items())
