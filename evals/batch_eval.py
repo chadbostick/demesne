@@ -69,27 +69,37 @@ def main():
         print(f"  Args: {' '.join(config['args'])}")
         print(f"{'─'*60}")
 
-        # Build eval command
+        # Step 1: Run simulation directly
+        sim_cmd = [
+            sys.executable,
+            os.path.join(PROJECT_ROOT, "main.py"),
+        ] + config["args"]
+        print(f"  Running simulation...")
+        try:
+            sim_result = subprocess.run(sim_cmd, cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=900)
+        except subprocess.TimeoutExpired:
+            print(f"  SIMULATION TIMED OUT after 900s")
+            results.append({"run": i+1, "config": config["label"], "status": "TIMEOUT"})
+            continue
+        if sim_result.returncode != 0:
+            print(f"  SIMULATION FAILED: {sim_result.stderr[-200:]}")
+            results.append({"run": i+1, "config": config["label"], "status": "CRASHED", "error": sim_result.stderr[-200:]})
+            continue
+        print(f"  Simulation complete. Evaluating...")
+
+        # Step 2: Run eval on the newest output (skip-run mode, no extra args to conflict)
         eval_cmd = [
             sys.executable,
             os.path.join(PROJECT_ROOT, "evals", "run_and_evaluate.py"),
-        ] + config["args"]
+            "--skip-run",
+        ]
 
-        if args.skip_scoring:
-            # Run simulation directly, then analyze without LLM
-            sim_cmd = [
-                sys.executable,
-                os.path.join(PROJECT_ROOT, "main.py"),
-            ] + config["args"]
-            sim_result = subprocess.run(sim_cmd, cwd=PROJECT_ROOT, capture_output=True, text=True)
-            if sim_result.returncode != 0:
-                print(f"  SIMULATION FAILED: {sim_result.stderr[-200:]}")
-                results.append({"run": i+1, "config": config["label"], "status": "CRASHED", "error": sim_result.stderr[-200:]})
-                continue
-            # Run eval without re-running sim
-            eval_cmd.append("--skip-run")
-
-        eval_result = subprocess.run(eval_cmd, cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=600)
+        try:
+            eval_result = subprocess.run(eval_cmd, cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=1200)
+        except subprocess.TimeoutExpired:
+            print(f"  TIMED OUT after 1200s")
+            results.append({"run": i+1, "config": config["label"], "status": "TIMEOUT"})
+            continue
 
         if eval_result.returncode != 0:
             print(f"  EVAL FAILED: {eval_result.stderr[-200:]}")
@@ -164,12 +174,14 @@ def main():
                 print(f"  {bug_type}: {count} occurrences")
 
     # Save batch report
+    avg_bugs_final = avg_bugs if ok_runs else 0
+    avg_score_final = avg_score if ok_runs else 0
     batch_report = {
         "timestamp": datetime.now().isoformat(),
         "runs_attempted": args.runs,
         "runs_succeeded": len(ok_runs),
-        "average_bugs": avg_bugs if ok_runs else 0,
-        "average_score": avg_score if ok_runs else 0,
+        "average_bugs": avg_bugs_final,
+        "average_score": avg_score_final,
         "results": results,
     }
     batch_path = os.path.join(PROJECT_ROOT, "evals", f"batch_{datetime.now().strftime('%Y%m%d_%H%M')}.json")
